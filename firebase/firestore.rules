@@ -1,0 +1,171 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ─────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'admin';
+    }
+
+    function isModerator() {
+      return isAuthenticated() && request.auth.token.role == 'moderator';
+    }
+
+    function isAdminOrMod() {
+      return isAdmin() || isModerator();
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function hasModPermission(perm) {
+      return isModerator() && request.auth.token.permissions[perm] == true;
+    }
+
+    function canManageContent() {
+      return isAdmin() || hasModPermission('canManageCourses') || hasModPermission('canManageQuestions');
+    }
+
+    // ─── Users ────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Usernames (reservation) ──────────────────────────
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Courses ──────────────────────────────────────────
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin() || hasModPermission('canManageCourses');
+    }
+
+    // ─── Topics ───────────────────────────────────────────
+    match /topics/{topicId} {
+      allow read: if true;
+      allow write: if isAdmin() || hasModPermission('canManageTopics');
+    }
+
+    // ─── Notes ────────────────────────────────────────────
+    match /notes/{noteId} {
+      allow read: if resource.data.isPublic == true || isOwner(resource.data.authorUid) || isAdminOrMod();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(resource.data.authorUid) || isAdmin() || hasModPermission('canManageNotes');
+      allow delete: if isOwner(resource.data.authorUid) || isAdmin() || hasModPermission('canManageNotes');
+    }
+
+    // ─── Public Questions ─────────────────────────────────
+    match /questions_public/{questionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdminOrMod();
+      allow update: if isAdmin() || hasModPermission('canManageQuestions');
+      allow delete: if isAdmin() || hasModPermission('canManageQuestions');
+    }
+
+    // ─── User Private Questions ───────────────────────────
+    match /users/{userId}/questions/{questionId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ─── Review Queue ─────────────────────────────────────
+    match /review_queue/{requestId} {
+      allow read: if isAdminOrMod();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || hasModPermission('canReviewQuestions');
+      allow delete: if isAdmin();
+    }
+
+    // ─── Sessions ─────────────────────────────────────────
+    match /sessions/{sessionId} {
+      allow read: if isOwner(resource.data.userId) || isAdminOrMod();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    // ─── Attempts ─────────────────────────────────────────
+    match /attempts/{attemptId} {
+      allow read: if isOwner(resource.data.userId) || isAdminOrMod();
+      allow create: if isAuthenticated();
+    }
+
+    // ─── Labs ─────────────────────────────────────────────
+    match /labs/{labId} {
+      allow read: if true;
+      allow write: if isAdmin() || hasModPermission('canManageLabs');
+    }
+
+    // ─── Lab Sessions ─────────────────────────────────────
+    match /lab_sessions/{sessionId} {
+      allow read: if isOwner(resource.data.userId) || isAdminOrMod();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(resource.data.userId);
+    }
+
+    // ─── User Stats ───────────────────────────────────────
+    match /user_stats/{userId} {
+      allow read: if isOwner(userId) || isAdminOrMod();
+      allow write: if false; // Only Cloud Functions write here
+    }
+
+    // ─── Course Stats ─────────────────────────────────────
+    match /course_stats/{courseId} {
+      allow read: if true;
+      allow write: if false; // Only Cloud Functions write here
+    }
+
+    // ─── Daily Summaries ──────────────────────────────────
+    match /daily_summaries/{summaryId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only Cloud Functions
+    }
+
+    // ─── Activity Events ──────────────────────────────────
+    match /activity_events/{eventId} {
+      allow read: if isAdminOrMod();
+      allow create: if isAuthenticated();
+    }
+
+    // ─── Audit Log ────────────────────────────────────────
+    match /audit_log/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdminOrMod();
+    }
+
+    // ─── Announcements ────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin() || hasModPermission('canManageAnnouncements');
+    }
+
+    // ─── Feature Flags ────────────────────────────────────
+    match /feature_flags/{flagId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Practice Settings ────────────────────────────────
+    match /practice_settings/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Supporter Tiers ──────────────────────────────────
+    match /supporter_tiers/{tierId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
