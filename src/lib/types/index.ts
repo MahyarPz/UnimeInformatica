@@ -480,7 +480,6 @@ export interface DailySummary {
 export interface PresenceData {
   state: 'online' | 'offline';
   username: string;
-  role: UserRole;
   lastActive: number; // timestamp ms
   currentPath?: string;
 }

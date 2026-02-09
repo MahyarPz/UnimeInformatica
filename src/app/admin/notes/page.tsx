@@ -208,8 +208,8 @@ function NoteUploadDialog({
         fileType: file.type,
         fileSize: file.size,
         isPublic: true,
-        authorUid: user.uid,
-        authorUsername: userProfile.username,
+        creatorId: user.uid,
+        creatorUsername: userProfile.username,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

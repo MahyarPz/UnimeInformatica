@@ -6,7 +6,7 @@
         ".write": "$uid === auth.uid",
         ".validate": "newData.hasChildren(['username', 'state', 'lastActive'])",
         "username": { ".validate": "newData.isString() && newData.val().length <= 30" },
-        "state": { ".validate": "newData.isString() && (newData.val() === 'online' || newData.val() === 'idle')" },
+        "state": { ".validate": "newData.isString() && (newData.val() === 'online' || newData.val() === 'idle' || newData.val() === 'offline')" },
         "lastActive": { ".validate": "newData.isNumber()" },
         "currentPath": { ".validate": "newData.isString()" }
       }

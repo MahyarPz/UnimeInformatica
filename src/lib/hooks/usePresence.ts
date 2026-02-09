@@ -22,19 +22,12 @@ export function usePresence() {
         set(presenceRef, {
           state: 'online',
           username: userProfile.username,
-          role: userProfile.role,
           lastActive: Date.now(),
           currentPath: pathname || '/',
         });
 
-        // On disconnect, set offline
-        onDisconnect(presenceRef).set({
-          state: 'offline',
-          username: userProfile.username,
-          role: userProfile.role,
-          lastActive: Date.now(),
-          currentPath: '',
-        });
+        // On disconnect, remove node entirely (avoids stale data)
+        onDisconnect(presenceRef).remove();
       }
     });
 
@@ -44,7 +37,6 @@ export function usePresence() {
         set(presenceRef, {
           state: 'online',
           username: userProfile.username,
-          role: userProfile.role,
           lastActive: Date.now(),
           currentPath: pathname || '/',
         });

@@ -212,7 +212,7 @@ export default function AdminUsersPage() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="moderator">Moderator</SelectItem>
-                  <SelectItem value="student">Student</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -253,7 +253,7 @@ function PromoteByUsernameCard({ addToast, user, userProfile }: any) {
     if (!username) return;
     setLoading(true);
     try {
-      const q = query(collection(db, 'users'), where('username', '==', username.replace('@', '')));
+      const q = query(collection(db, 'users'), where('username_lower', '==', username.replace('@', '').toLowerCase()));
       const snap = await getDocs(q);
       if (snap.empty) {
         addToast({ title: `User @${username} not found`, variant: 'destructive' });
@@ -382,7 +382,7 @@ function UserCard({
                 >
                   <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="user">User</SelectItem>
                     <SelectItem value="moderator">Moderator</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>

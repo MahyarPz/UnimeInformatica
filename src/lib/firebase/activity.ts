@@ -58,7 +58,7 @@ export async function logAudit({
   details?: Record<string, any>;
 }) {
   try {
-    await addDoc(collection(db, 'audit_logs'), {
+    await addDoc(collection(db, 'audit_log'), {
       action,
       category,
       actorUid,

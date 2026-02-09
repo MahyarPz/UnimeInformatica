@@ -100,12 +100,13 @@ export function useTopics(courseId: string) {
     let q;
     try {
       q = query(
-        collection(db, 'courses', courseId, 'topics'),
+        collection(db, 'topics'),
+        where('courseId', '==', courseId),
         where('active', '==', true),
         orderBy('order', 'asc')
       );
     } catch {
-      q = query(collection(db, 'courses', courseId, 'topics'));
+      q = query(collection(db, 'topics'), where('courseId', '==', courseId));
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -118,7 +119,7 @@ export function useTopics(courseId: string) {
     }, (error) => {
       console.error('useTopics error:', error);
       // Fallback without compound query
-      const fallbackQ = query(collection(db, 'courses', courseId, 'topics'));
+      const fallbackQ = query(collection(db, 'topics'), where('courseId', '==', courseId));
       onSnapshot(fallbackQ, (snapshot) => {
         const data = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() } as Topic))
