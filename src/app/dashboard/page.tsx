@@ -554,7 +554,7 @@ function EditQuestionDialog({ question, courses, onSubmit }: { question: Questio
   const [text, setText] = useState(question.questionText || '');
   const [type, setType] = useState<'mcq' | 'essay'>(question.type as any || 'mcq');
   const [courseId, setCourseId] = useState(question.courseId || '');
-  const [difficulty, setDifficulty] = useState(question.difficulty || 'medium');
+  const [difficulty, setDifficulty] = useState(String(question.difficulty || 'medium'));
   const [options, setOptions] = useState(
     question.options?.map((o: any) => typeof o === 'string' ? o : o.text) || ['', '', '', '']
   );
