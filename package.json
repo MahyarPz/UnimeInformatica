@@ -8,8 +8,7 @@
     "build": "next build",
     "start": "next start -p $PORT",
     "lint": "next lint",
-    "seed": "ts-node --project tsconfig.seed.json scripts/seed.ts",
-    "postinstall": "next build"
+    "seed": "ts-node --project tsconfig.seed.json scripts/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
