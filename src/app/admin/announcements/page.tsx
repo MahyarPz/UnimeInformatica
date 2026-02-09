@@ -43,6 +43,8 @@ export default function AdminAnnouncementsPage() {
         authorUid: user!.uid,
         authorUsername: userProfile!.username,
         active: true,
+        startAt: serverTimestamp(),
+        endAt: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
