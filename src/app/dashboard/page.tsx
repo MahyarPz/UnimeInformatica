@@ -304,14 +304,12 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            {(q.status === 'draft' || q.status === 'rejected') && (
-                              <EditQuestionDialog question={q} courses={courses} onSubmit={async (data) => {
-                                try {
-                                  await updateDoc(doc(db, 'questions_private', q.id), { ...data, updatedAt: serverTimestamp() });
-                                  addToast({ title: 'Question updated!', variant: 'success' });
-                                } catch { addToast({ title: 'Failed to update', variant: 'destructive' }); }
-                              }} />
-                            )}
+                            <EditQuestionDialog question={q} courses={courses} onSubmit={async (data) => {
+                              try {
+                                await updateDoc(doc(db, 'questions_private', q.id), { ...data, updatedAt: serverTimestamp() });
+                                addToast({ title: 'Question updated!', variant: 'success' });
+                              } catch { addToast({ title: 'Failed to update', variant: 'destructive' }); }
+                            }} />
                             {q.status === 'draft' && (
                               <Button size="sm" variant="outline" onClick={() => submitForReview(q)}>
                                 <Send className="h-3 w-3 mr-1" /> Submit

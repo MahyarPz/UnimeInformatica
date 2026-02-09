@@ -205,6 +205,9 @@ export default function AdminQuestionsPage() {
                       <Badge variant={q.type === 'mcq' ? 'default' : 'secondary'} className="text-xs">{q.type.toUpperCase()}</Badge>
                     </div>
                   </div>
+                  <EditPublicQuestionDialog question={q} courses={courses} topics={topics} addToast={addToast}>
+                    <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                  </EditPublicQuestionDialog>
                   <Button variant="ghost" size="icon" onClick={() => deleteQuestion(q.id)}>
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
@@ -298,7 +301,7 @@ function QuestionFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Type</Label>
-              <Select value={type} onValueChange={(v) => setType(v as 'mcq' | 'essay')}>
+              <Select value={type} onValueChange={(v: string) => setType(v as 'mcq' | 'essay')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="mcq">Multiple Choice</SelectItem>
@@ -378,6 +381,189 @@ function QuestionFormDialog({
           <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
           <DialogClose asChild>
             <Button disabled={!questionText || !courseId} onClick={handleCreate}>Create Question</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditPublicQuestionDialog({
+  children,
+  question,
+  courses,
+  topics,
+  addToast,
+}: {
+  children: React.ReactNode;
+  question: Question;
+  courses: Course[];
+  topics: Topic[];
+  addToast: any;
+}) {
+  const [type, setType] = useState<'mcq' | 'essay'>(question.type as any || 'mcq');
+  const [courseId, setCourseId] = useState(question.courseId || '');
+  const [topicId, setTopicId] = useState(question.topicId || '');
+  const [difficulty, setDifficulty] = useState(String(question.difficulty || '3'));
+  const [questionText, setQuestionText] = useState(question.questionText || '');
+  const [optionA, setOptionA] = useState('');
+  const [optionB, setOptionB] = useState('');
+  const [optionC, setOptionC] = useState('');
+  const [optionD, setOptionD] = useState('');
+  const [correctAnswer, setCorrectAnswer] = useState('A');
+  const [explanation, setExplanation] = useState(question.explanation || '');
+  const [hint, setHint] = useState(question.hints?.[0] || '');
+  const [rubric, setRubric] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Pre-fill MCQ options from question data
+  React.useEffect(() => {
+    if (question.type === 'mcq' && Array.isArray(question.options)) {
+      const opts = question.options as Array<{ text: string; isCorrect: boolean }>;
+      setOptionA(opts[0]?.text || '');
+      setOptionB(opts[1]?.text || '');
+      setOptionC(opts[2]?.text || '');
+      setOptionD(opts[3]?.text || '');
+      const correctIdx = opts.findIndex((o) => o.isCorrect);
+      const map: Record<number, string> = { 0: 'A', 1: 'B', 2: 'C', 3: 'D' };
+      setCorrectAnswer(map[correctIdx] || 'A');
+    }
+    if (question.type === 'essay' && Array.isArray((question as any).rubric)) {
+      setRubric((question as any).rubric.join('\n'));
+    }
+  }, [question]);
+
+  const filteredTopics = topics.filter((t) => t.courseId === courseId);
+
+  const handleSave = async () => {
+    if (!questionText || !courseId) return;
+    setSaving(true);
+    try {
+      const correctMap: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+      const data: any = {
+        type,
+        courseId,
+        topicId: topicId || null,
+        difficulty: parseInt(difficulty),
+        questionText,
+        explanation: explanation || null,
+        hints: hint ? [hint] : [],
+        updatedAt: serverTimestamp(),
+      };
+      if (type === 'mcq') {
+        const allOptions = [optionA, optionB, optionC, optionD];
+        const correctIdx = correctMap[correctAnswer] ?? 0;
+        data.options = allOptions.map((text, idx) => ({
+          text,
+          isCorrect: idx === correctIdx,
+        }));
+        data.correctIndex = correctIdx;
+      } else {
+        data.rubric = rubric ? rubric.split('\n').filter(Boolean) : [];
+      }
+      await updateDoc(doc(db, 'questions_public', question.id), data);
+      addToast({ title: 'Question updated!', variant: 'success' });
+    } catch (error) {
+      console.error('Failed to update question:', error);
+      addToast({ title: 'Failed to update question', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Question</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Type</Label>
+              <Select value={type} onValueChange={(v: string) => setType(v as 'mcq' | 'essay')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mcq">Multiple Choice</SelectItem>
+                  <SelectItem value="essay">Essay</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Difficulty</Label>
+              <Select value={difficulty} onValueChange={setDifficulty}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[1,2,3,4,5].map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Course *</Label>
+              <Select value={courseId} onValueChange={setCourseId}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Topic</Label>
+              <Select value={topicId} onValueChange={setTopicId}>
+                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectContent>
+                  {filteredTopics.map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label>Question Text *</Label>
+            <Textarea value={questionText} onChange={(e) => setQuestionText(e.target.value)} rows={3} />
+          </div>
+          {type === 'mcq' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Option A</Label><Input value={optionA} onChange={(e) => setOptionA(e.target.value)} /></div>
+                <div><Label>Option B</Label><Input value={optionB} onChange={(e) => setOptionB(e.target.value)} /></div>
+                <div><Label>Option C</Label><Input value={optionC} onChange={(e) => setOptionC(e.target.value)} /></div>
+                <div><Label>Option D</Label><Input value={optionD} onChange={(e) => setOptionD(e.target.value)} /></div>
+              </div>
+              <div>
+                <Label>Correct Answer</Label>
+                <Select value={correctAnswer} onValueChange={setCorrectAnswer}>
+                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['A','B','C','D'].map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+          {type === 'essay' && (
+            <div>
+              <Label>Rubric / Grading Criteria</Label>
+              <Textarea value={rubric} onChange={(e) => setRubric(e.target.value)} rows={3} />
+            </div>
+          )}
+          <div>
+            <Label>Explanation</Label>
+            <Textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} rows={2} />
+          </div>
+          <div>
+            <Label>Hint</Label>
+            <Input value={hint} onChange={(e) => setHint(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose asChild>
+            <Button disabled={!questionText || !courseId || saving} onClick={handleSave}>
+              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save Changes'}
+            </Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
