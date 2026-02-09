@@ -96,12 +96,15 @@ export default function AdminQuestionsPage() {
   const courseName = (id: string) => courses.find((c) => c.id === id)?.title || '';
   const topicName = (id: string) => topics.find((t) => t.id === id)?.title || '';
 
-  const difficultyColors: Record<number, string> = {
-    1: 'bg-green-100 text-green-700',
-    2: 'bg-blue-100 text-blue-700',
-    3: 'bg-yellow-100 text-yellow-700',
-    4: 'bg-orange-100 text-orange-700',
-    5: 'bg-red-100 text-red-700',
+  const difficultyColors: Record<string, string> = {
+    '1': 'bg-green-100 text-green-700',
+    '2': 'bg-blue-100 text-blue-700',
+    '3': 'bg-yellow-100 text-yellow-700',
+    '4': 'bg-orange-100 text-orange-700',
+    '5': 'bg-red-100 text-red-700',
+    easy: 'bg-green-100 text-green-700',
+    medium: 'bg-yellow-100 text-yellow-700',
+    hard: 'bg-red-100 text-red-700',
   };
 
   return (
@@ -196,7 +199,7 @@ export default function AdminQuestionsPage() {
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       <Badge variant="outline" className="text-xs">{courseName(q.courseId)}</Badge>
                       {q.topicId && <Badge variant="secondary" className="text-xs">{topicName(q.topicId)}</Badge>}
-                      <Badge className={`text-xs ${difficultyColors[q.difficulty] || ''}`}>D{q.difficulty}</Badge>
+                      <Badge className={`text-xs ${difficultyColors[String(q.difficulty)] || ''}`}>D{q.difficulty}</Badge>
                       <Badge variant={q.type === 'mcq' ? 'default' : 'secondary'} className="text-xs">{q.type.toUpperCase()}</Badge>
                     </div>
                   </div>

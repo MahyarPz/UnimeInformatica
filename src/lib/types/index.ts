@@ -11,6 +11,8 @@ export interface ModeratorPermissions {
   canReviewQuestions: boolean;
   canManageLabs: boolean;
   canManageAnnouncements: boolean;
+  canManageUsers: boolean;
+  canManageSettings: boolean;
   canViewUsers: boolean;
   canViewAnalytics: boolean;
   canViewAuditLog: boolean;
@@ -18,12 +20,12 @@ export interface ModeratorPermissions {
 }
 
 export interface PermissionTemplate {
-  id: string;
+  id?: string;
   name: string;
   description: string;
   permissions: ModeratorPermissions;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const DEFAULT_MODERATOR_PERMISSIONS: ModeratorPermissions = {
@@ -34,6 +36,8 @@ export const DEFAULT_MODERATOR_PERMISSIONS: ModeratorPermissions = {
   canReviewQuestions: true,
   canManageLabs: false,
   canManageAnnouncements: false,
+  canManageUsers: false,
+  canManageSettings: false,
   canViewUsers: false,
   canViewAnalytics: false,
   canViewAuditLog: false,
@@ -55,11 +59,12 @@ export interface UserProfile {
   bio?: string;
   role: UserRole;
   permissions?: ModeratorPermissions;
+  banned?: boolean;
   publicProfile: boolean;
   showDisplayName: boolean;
   showContributions: boolean;
   supporterTier?: string;
-  createdAt: any; // Firestore Timestamp
+  createdAt: any;
   updatedAt: any;
   lastLoginAt?: any;
   streak?: number;
@@ -132,7 +137,7 @@ export interface Note {
 // QUESTION TYPES
 // ============================================================
 export type QuestionType = 'mcq' | 'essay';
-export type DifficultyLevel = 'easy' | 'medium' | 'hard';
+export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 1 | 2 | 3 | 4 | 5;
 export type QuestionStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'published';
 
 export interface MCQOption {
@@ -175,14 +180,18 @@ export interface Question {
 export interface ReviewRequest {
   id: string;
   questionId: string;
-  question: Question;
+  question?: Question;
+  questionData?: any;
   submitterId: string;
+  submitterUid?: string;
   submitterUsername: string;
   courseId: string;
   topicId?: string;
   status: 'pending' | 'approved' | 'rejected';
   reviewerId?: string;
   reviewerNote?: string;
+  feedback?: string;
+  submittedAt?: any;
   createdAt: any;
   reviewedAt?: any;
 }
@@ -195,17 +204,30 @@ export type SessionStatus = 'in_progress' | 'paused' | 'completed' | 'abandoned'
 
 export interface PracticeSettings {
   courseId: string;
-  quickPracticeCount: number;
-  mockExamCount: number;
-  mockExamTimeMinutes: number;
-  adaptiveWindowSize: number;
-  weaknessThreshold: number;
-  weaknessRatio: number;
-  repetitionCap: number;
-  resumeEnabled: boolean;
-  resumeTTLHours: number;
-  createdAt: any;
-  updatedAt: any;
+  // Core counts
+  quickPracticeCount?: number;
+  mockExamCount?: number;
+  mockExamTimeMinutes?: number;
+  defaultQuestionCount?: number;
+  timeLimitMinutes?: number;
+  passingScore?: number;
+  // Adaptive
+  adaptiveWindowSize?: number;
+  weaknessThreshold?: number;
+  weaknessRatio?: number;
+  repetitionCap?: number;
+  // Features
+  resumeEnabled?: boolean;
+  resumeTTLHours?: number;
+  allowHints?: boolean;
+  showExplanations?: boolean;
+  enableSpacedRepetition?: boolean;
+  enableTimer?: boolean;
+  shuffleOptions?: boolean;
+  shuffleQuestions?: boolean;
+  difficultyRange?: { min: number; max: number };
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface ExamSession {
@@ -313,6 +335,7 @@ export interface Lab {
   topicId?: string;
   title: string;
   description: string;
+  difficulty?: string;
   datasetUrl: string;
   datasetFileName: string;
   previewColumns: string[];
@@ -327,7 +350,7 @@ export interface LabQuestion {
   id: string;
   type: LabQuestionType;
   questionText: string;
-  options?: string[]; // MCQ
+  options?: string[] | Record<string, string>; // MCQ - array or keyed object
   correctAnswer?: string; // MCQ correct option / numeric value
   tolerance?: number; // numeric
   rubric?: string[]; // short_text / interpretation
@@ -357,9 +380,9 @@ export interface LabSessionAnswer {
 // ============================================================
 // ANNOUNCEMENT TYPES
 // ============================================================
-export type AnnouncementLevel = 'info' | 'warning' | 'critical';
-export type AnnouncementAudience = 'all' | 'logged_in' | 'supporters';
-export type AnnouncementPlacement = 'banner' | 'home_only';
+export type AnnouncementLevel = 'info' | 'warning' | 'critical' | 'success' | 'error';
+export type AnnouncementAudience = 'all' | 'logged_in' | 'supporters' | 'students' | 'admins';
+export type AnnouncementPlacement = 'banner' | 'home_only' | 'modal' | 'toast';
 
 export interface Announcement {
   id: string;
@@ -368,10 +391,14 @@ export interface Announcement {
   level: AnnouncementLevel;
   audience: AnnouncementAudience;
   placement: AnnouncementPlacement;
-  startAt: any;
+  startAt?: any;
   endAt?: any;
   active: boolean;
-  createdBy: string;
+  linkUrl?: string;
+  linkText?: string;
+  authorUid?: string;
+  authorUsername?: string;
+  createdBy?: string;
   createdAt: any;
   updatedAt: any;
 }
@@ -380,7 +407,9 @@ export interface Announcement {
 // FEATURE FLAGS
 // ============================================================
 export interface FeatureFlag {
+  id: string;
   key: string;
+  name?: string;
   enabled: boolean;
   description: string;
   updatedAt: any;

@@ -35,7 +35,7 @@ export function CourseNotesTab({ courseId }: { courseId: string }) {
     return () => unsubscribe();
   }, [courseId]);
 
-  const allTags = [...new Set(notes.flatMap((n) => n.tags || []))];
+  const allTags = Array.from(new Set(notes.flatMap((n) => n.tags || [])));
   const filtered = notes.filter((n) => {
     const matchSearch = !search || n.title.toLowerCase().includes(search.toLowerCase());
     const matchTag = !selectedTag || n.tags?.includes(selectedTag);

@@ -65,6 +65,7 @@ export default function AdminAnnouncementsPage() {
   const typeColors: Record<string, string> = {
     info: 'bg-blue-100 text-blue-700',
     warning: 'bg-yellow-100 text-yellow-700',
+    critical: 'bg-red-100 text-red-700',
     success: 'bg-green-100 text-green-700',
     error: 'bg-red-100 text-red-700',
   };
@@ -90,9 +91,9 @@ export default function AdminAnnouncementsPage() {
                   <Megaphone className="h-4 w-4 text-primary" />
                   <div>
                     <p className="font-medium">{a.title}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{a.message}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">{a.content}</p>
                     <div className="flex gap-1.5 mt-1">
-                      <Badge className={typeColors[a.type] || ''}>{a.type}</Badge>
+                      <Badge className={typeColors[a.level] || ''}>{a.level}</Badge>
                       <Badge variant="outline">{a.audience || 'all'}</Badge>
                       <Badge variant="outline">{a.placement || 'banner'}</Badge>
                       <span className="text-xs text-muted-foreground">{a.createdAt ? timeAgo(a.createdAt) : ''}</span>
@@ -120,8 +121,8 @@ export default function AdminAnnouncementsPage() {
 
 function AnnouncementFormDialog({ children, onSubmit }: { children: React.ReactNode; onSubmit: (data: any) => void }) {
   const [title, setTitle] = useState('');
-  const [message, setMessage] = useState('');
-  const [type, setType] = useState('info');
+  const [content, setContent] = useState('');
+  const [level, setLevel] = useState<string>('info');
   const [audience, setAudience] = useState('all');
   const [placement, setPlacement] = useState('banner');
   const [linkUrl, setLinkUrl] = useState('');
@@ -134,11 +135,11 @@ function AnnouncementFormDialog({ children, onSubmit }: { children: React.ReactN
         <DialogHeader><DialogTitle>New Announcement</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div><Label>Title *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-          <div><Label>Message *</Label><Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} /></div>
+          <div><Label>Content *</Label><Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} /></div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <Label>Type</Label>
-              <Select value={type} onValueChange={setType}>
+              <Label>Level</Label>
+              <Select value={level} onValueChange={setLevel}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="info">Info</SelectItem>
@@ -179,7 +180,7 @@ function AnnouncementFormDialog({ children, onSubmit }: { children: React.ReactN
         <DialogFooter>
           <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
           <DialogClose asChild>
-            <Button disabled={!title || !message} onClick={() => onSubmit({ title, message, type, audience, placement, linkUrl, linkText })}>
+            <Button disabled={!title || !content} onClick={() => onSubmit({ title, content, level, audience, placement, linkUrl, linkText })}>
               Create
             </Button>
           </DialogClose>

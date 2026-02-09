@@ -47,16 +47,20 @@ export function AnnouncementBanner() {
 
   if (visibleAnnouncements.length === 0) return null;
 
-  const levelStyles = {
+  const levelStyles: Record<string, string> = {
     info: 'bg-blue-50 border-blue-200 text-blue-800',
     warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
     critical: 'bg-red-50 border-red-200 text-red-800',
+    success: 'bg-green-50 border-green-200 text-green-800',
+    error: 'bg-red-50 border-red-200 text-red-800',
   };
 
-  const levelIcons = {
+  const levelIcons: Record<string, any> = {
     info: Info,
     warning: AlertTriangle,
     critical: AlertCircle,
+    success: Info,
+    error: AlertCircle,
   };
 
   return (
@@ -71,7 +75,7 @@ export function AnnouncementBanner() {
                 <span className="text-sm font-medium truncate">{a.title}</span>
                 {a.content && <span className="text-sm hidden sm:inline">— {a.content}</span>}
               </div>
-              <button onClick={() => setDismissed((prev) => new Set([...prev, a.id]))} className="shrink-0 hover:opacity-70">
+              <button onClick={() => setDismissed((prev) => new Set(Array.from(prev).concat(a.id)))} className="shrink-0 hover:opacity-70">
                 <X className="h-4 w-4" />
               </button>
             </div>

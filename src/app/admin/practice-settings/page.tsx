@@ -144,18 +144,18 @@ export default function AdminPracticeSettingsPage() {
                 <div className="flex gap-2 items-center">
                   <Input
                     type="number"
-                    value={settings.difficultyRange.min}
+                    value={settings.difficultyRange?.min ?? 1}
                     onChange={(e) =>
-                      setSettings({ ...settings, difficultyRange: { ...settings.difficultyRange, min: parseInt(e.target.value) || 1 } })
+                      setSettings({ ...settings, difficultyRange: { ...(settings.difficultyRange || { min: 1, max: 5 }), min: parseInt(e.target.value) || 1 } })
                     }
                     min={1} max={5} className="w-20"
                   />
                   <span className="text-muted-foreground">to</span>
                   <Input
                     type="number"
-                    value={settings.difficultyRange.max}
+                    value={settings.difficultyRange?.max ?? 5}
                     onChange={(e) =>
-                      setSettings({ ...settings, difficultyRange: { ...settings.difficultyRange, max: parseInt(e.target.value) || 5 } })
+                      setSettings({ ...settings, difficultyRange: { ...(settings.difficultyRange || { min: 1, max: 5 }), max: parseInt(e.target.value) || 5 } })
                     }
                     min={1} max={5} className="w-20"
                   />

@@ -52,6 +52,7 @@ const PERMISSION_TEMPLATES: PermissionTemplate[] = [
     name: 'Full Moderator',
     description: 'All permissions except user management',
     permissions: {
+      ...DEFAULT_MODERATOR_PERMISSIONS,
       canManageCourses: true,
       canManageTopics: true,
       canManageNotes: true,
@@ -59,7 +60,10 @@ const PERMISSION_TEMPLATES: PermissionTemplate[] = [
       canReviewQuestions: true,
       canManageLabs: true,
       canManageAnnouncements: true,
+      canViewUsers: true,
       canViewAnalytics: true,
+      canViewAuditLog: true,
+      canViewActivityFeed: true,
       canManageUsers: false,
       canManageSettings: false,
     },
@@ -90,7 +94,8 @@ export default function AdminUsersPage() {
       const q = searchQuery.toLowerCase();
       return (
         u.username.toLowerCase().includes(q) ||
-        u.displayName.toLowerCase().includes(q) ||
+        (u.firstName || '').toLowerCase().includes(q) ||
+        (u.lastName || '').toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q)
       );
     }
@@ -119,7 +124,7 @@ export default function AdminUsersPage() {
         actorUid: user!.uid,
         actorUsername: userProfile!.username,
         actorRole: userProfile!.role,
-        targetUid: targetUser.uid,
+        targetId: targetUser.uid,
         details: { oldRole: targetUser.role, newRole, username: targetUser.username },
       });
 
@@ -158,7 +163,7 @@ export default function AdminUsersPage() {
         actorUid: user!.uid,
         actorUsername: userProfile!.username,
         actorRole: userProfile!.role,
-        targetUid: targetUser.uid,
+        targetId: targetUser.uid,
         details: { username: targetUser.username },
       });
       addToast({ title: newBanned ? 'User banned' : 'User unbanned', variant: 'success' });
@@ -266,7 +271,7 @@ function PromoteByUsernameCard({ addToast, user, userProfile }: any) {
         actorUid: user.uid,
         actorUsername: userProfile.username,
         actorRole: userProfile.role,
-        targetUid: targetDoc.id,
+        targetId: targetDoc.id,
         details: { username, newRole: role },
       });
       addToast({ title: `@${username} promoted to ${role}`, variant: 'success' });
@@ -354,11 +359,11 @@ function UserCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-              {targetUser.displayName.charAt(0).toUpperCase()}
+              {targetUser.username.charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-medium">{targetUser.displayName}</span>
+                <span className="font-medium">{targetUser.firstName ? `${targetUser.firstName} ${targetUser.lastName || ''}`.trim() : targetUser.username}</span>
                 <span className="text-sm text-muted-foreground">@{targetUser.username}</span>
                 {targetUser.banned && <Badge variant="destructive">Banned</Badge>}
               </div>

@@ -47,7 +47,7 @@ export default function AdminAuditLogPage() {
     return true;
   });
 
-  const uniqueActions = [...new Set(logs.map((l) => l.action))].sort();
+  const uniqueActions = Array.from(new Set(logs.map((l) => l.action))).sort();
 
   const actionColors: Record<string, string> = {
     course_created: 'bg-green-100 text-green-700',
@@ -121,7 +121,7 @@ export default function AdminAuditLogPage() {
                         {log.action?.replace(/_/g, ' ')}
                       </Badge>
                       <Badge variant="outline" className="text-xs">{log.actorRole}</Badge>
-                      {log.targetUid && <span className="text-xs text-muted-foreground">→ {log.targetUid.substring(0, 8)}</span>}
+                      {log.targetId && <span className="text-xs text-muted-foreground">→ {log.targetId.substring(0, 8)}</span>}
                     </div>
                     {log.details && Object.keys(log.details).length > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">

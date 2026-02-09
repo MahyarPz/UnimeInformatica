@@ -7,6 +7,9 @@ import { Navigation } from "@/components/layout/Navigation";
 import { AnnouncementBanner } from "@/components/layout/AnnouncementBanner";
 import { PresenceWrapper } from "@/components/layout/PresenceWrapper";
 
+// Force all pages to be dynamically rendered (no SSG) — Firebase needs runtime env vars
+export const dynamic = 'force-dynamic';
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {

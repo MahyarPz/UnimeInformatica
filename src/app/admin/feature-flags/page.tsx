@@ -22,7 +22,7 @@ export default function AdminFeatureFlagsPage() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'feature_flags'), (snap) => {
-      setFlags(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FeatureFlag)));
+      setFlags(snap.docs.map((d) => ({ id: d.id, ...d.data() } as unknown as FeatureFlag)));
       setLoading(false);
     });
     return () => unsub();

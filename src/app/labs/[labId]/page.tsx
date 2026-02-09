@@ -215,7 +215,7 @@ export default function LabRunPage() {
           <CardContent>
             {currentQuestion.type === 'mcq' && currentQuestion.options && (
               <div className="space-y-2">
-                {currentQuestion.options.map((opt, idx) => (
+                {(Array.isArray(currentQuestion.options) ? currentQuestion.options : Object.values(currentQuestion.options)).map((opt: string, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => handleAnswer(opt)}

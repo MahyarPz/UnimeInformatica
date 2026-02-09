@@ -86,7 +86,7 @@ export default function AdminReviewQueuePage() {
         actorUid: user!.uid,
         actorUsername: userProfile!.username,
         actorRole: userProfile!.role,
-        targetUid: request.submitterUid,
+        targetId: request.submitterUid,
         details: { requestId: request.id },
       });
 
@@ -111,7 +111,7 @@ export default function AdminReviewQueuePage() {
         actorUid: user!.uid,
         actorUsername: userProfile!.username,
         actorRole: userProfile!.role,
-        targetUid: request.submitterUid,
+        targetId: request.submitterUid,
         details: { requestId: request.id, feedback },
       });
 

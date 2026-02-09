@@ -40,7 +40,7 @@ export const bootstrapAdmin = functions.https.onRequest(async (req, res) => {
       actorUid: 'system',
       actorUsername: 'system',
       actorRole: 'system',
-      targetUid: userRecord.uid,
+      targetId: userRecord.uid,
       details: { email: bootstrapEmail },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });

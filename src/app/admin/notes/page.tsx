@@ -116,7 +116,7 @@ export default function AdminNotesPage() {
                     <p className="text-xs text-muted-foreground">
                       {courseTitle(note.courseId)}
                       {note.topicId && ` • ${topicTitle(note.topicId)}`}
-                      {' • by @'}{note.authorUsername}
+                      {' • by @'}{note.creatorUsername}
                     </p>
                     {note.tags && note.tags.length > 0 && (
                       <div className="flex gap-1 mt-1">
