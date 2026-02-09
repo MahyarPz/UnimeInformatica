@@ -34,12 +34,13 @@ export default function AdminLabsPage() {
 
   useEffect(() => {
     const unsub1 = onSnapshot(query(collection(db, 'courses'), orderBy('order')), (snap) =>
-      setCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Course)))
+      setCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Course))),
+      (err) => { console.error('courses query failed:', err); }
     );
     const unsub2 = onSnapshot(query(collection(db, 'labs'), orderBy('createdAt', 'desc')), (snap) => {
       setLabs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Lab)));
       setLoading(false);
-    });
+    }, (err) => { console.error('labs query failed:', err); setLoading(false); });
     return () => { unsub1(); unsub2(); };
   }, []);
 

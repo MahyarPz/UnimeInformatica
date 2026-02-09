@@ -32,7 +32,7 @@ export default function AdminAnnouncementsPage() {
     const unsub = onSnapshot(q, (snap) => {
       setAnnouncements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Announcement)));
       setLoading(false);
-    });
+    }, (err) => { console.error('announcements query failed:', err); setLoading(false); });
     return () => unsub();
   }, []);
 

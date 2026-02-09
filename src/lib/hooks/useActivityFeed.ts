@@ -42,6 +42,9 @@ export function useActivityFeed(maxEvents: number = 20, categoryFilter?: string)
       })) as ActivityEvent[];
       setEvents(data);
       setLoading(false);
+    }, (err) => {
+      console.error('activity_events query failed:', err);
+      setLoading(false);
     });
 
     return () => unsubscribe();

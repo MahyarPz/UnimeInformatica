@@ -40,7 +40,7 @@ export default function AdminPracticeSettingsPage() {
       const c = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Course));
       setCourses(c);
       if (c.length > 0 && !selectedCourse) setSelectedCourse(c[0].id);
-    });
+    }, (err) => { console.error('courses query failed:', err); });
     return () => unsub();
   }, []);
 

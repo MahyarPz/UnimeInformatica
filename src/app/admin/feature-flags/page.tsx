@@ -24,7 +24,7 @@ export default function AdminFeatureFlagsPage() {
     const unsub = onSnapshot(collection(db, 'feature_flags'), (snap) => {
       setFlags(snap.docs.map((d) => ({ id: d.id, ...d.data() } as unknown as FeatureFlag)));
       setLoading(false);
-    });
+    }, (err) => { console.error('feature_flags query failed:', err); setLoading(false); });
     return () => unsub();
   }, []);
 

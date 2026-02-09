@@ -37,12 +37,12 @@ export default function AdminReviewQueuePage() {
       const map: Record<string, string> = {};
       snap.forEach((d) => (map[d.id] = d.data().title));
       setCourses(map);
-    });
+    }, (err) => { console.error('courses query failed:', err); });
     const unsub2 = onSnapshot(collection(db, 'topics'), (snap) => {
       const map: Record<string, string> = {};
       snap.forEach((d) => (map[d.id] = d.data().title));
       setTopics(map);
-    });
+    }, (err) => { console.error('topics query failed:', err); });
     return () => { unsub1(); unsub2(); };
   }, []);
 

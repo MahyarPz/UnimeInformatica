@@ -84,7 +84,7 @@ export default function AdminUsersPage() {
     const unsub = onSnapshot(q, (snap) => {
       setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile)));
       setLoading(false);
-    });
+    }, (err) => { console.error('users query failed:', err); setLoading(false); });
     return () => unsub();
   }, []);
 

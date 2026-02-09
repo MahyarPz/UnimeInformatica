@@ -30,7 +30,7 @@ export default function AdminAuditLogPage() {
     const unsub = onSnapshot(q, (snap) => {
       setLogs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLog)));
       setLoading(false);
-    });
+    }, (err) => { console.error('audit_log query failed:', err); setLoading(false); });
     return () => unsub();
   }, [filterCategory, pageSize]);
 

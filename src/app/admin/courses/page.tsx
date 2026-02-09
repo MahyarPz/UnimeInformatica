@@ -29,7 +29,7 @@ export default function AdminCoursesPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setCourses(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Course)));
       setLoading(false);
-    });
+    }, (err) => { console.error('courses query failed:', err); setLoading(false); });
     return () => unsubscribe();
   }, []);
 

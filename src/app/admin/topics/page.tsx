@@ -28,7 +28,7 @@ export default function AdminTopicsPage() {
     const q = query(collection(db, 'courses'), orderBy('order', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
       setCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Course)));
-    });
+    }, (err) => { console.error('courses query failed:', err); });
     return () => unsub();
   }, []);
 
@@ -42,7 +42,7 @@ export default function AdminTopicsPage() {
     const unsub = onSnapshot(q, (snap) => {
       setTopics(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Topic)));
       setLoading(false);
-    });
+    }, (err) => { console.error('topics query failed:', err); setLoading(false); });
     return () => unsub();
   }, [selectedCourse]);
 

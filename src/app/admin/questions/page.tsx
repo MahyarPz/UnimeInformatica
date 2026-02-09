@@ -38,10 +38,12 @@ export default function AdminQuestionsPage() {
 
   useEffect(() => {
     const unsub1 = onSnapshot(query(collection(db, 'courses'), orderBy('order')), (snap) =>
-      setCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Course)))
+      setCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Course))),
+      (err) => { console.error('courses query failed:', err); }
     );
     const unsub2 = onSnapshot(query(collection(db, 'topics'), orderBy('order')), (snap) =>
-      setTopics(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Topic)))
+      setTopics(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Topic))),
+      (err) => { console.error('topics query failed:', err); }
     );
     return () => { unsub1(); unsub2(); };
   }, []);
@@ -51,7 +53,7 @@ export default function AdminQuestionsPage() {
     const unsub = onSnapshot(q, (snap) => {
       setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Question)));
       setLoading(false);
-    });
+    }, (err) => { console.error('questions_public query failed:', err); setLoading(false); });
     return () => unsub();
   }, []);
 
