@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [claims, setClaims] = useState<{ role?: UserRole } | null>(null);
+  const signingUpRef = useRef(false);
 
   const bootstrapEmail = process.env.NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL || '';
 
@@ -84,7 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let profile = await fetchProfile(firebaseUser.uid);
 
         // Auto-create profile if missing (handles orphaned Auth accounts)
-        if (!profile && firebaseUser.email) {
+        // Skip if signup is in progress — the signup transaction will create the profile
+        if (!profile && firebaseUser.email && !signingUpRef.current) {
           try {
             const email = firebaseUser.email;
             const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
@@ -174,6 +176,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = async (data: SignupData) => {
     const usernameLower = data.username.toLowerCase().trim();
 
+    // Prevent onAuthStateChanged from auto-creating a profile with random username
+    signingUpRef.current = true;
+
     // Create Firebase Auth account
     const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
 
@@ -225,9 +230,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (deleteError) {
         console.error('Failed to clean up orphaned Auth account:', deleteError);
       }
+      signingUpRef.current = false;
       throw error; // Re-throw so the caller (signup page) sees the error
     }
 
+    signingUpRef.current = false;
     // Fetch profile
     await fetchProfile(cred.user.uid);
   };
