@@ -29,6 +29,7 @@ export default function AdminReviewQueuePage() {
   const [topics, setTopics] = useState<Record<string, string>>({});
   const [tab, setTab] = useState('pending');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user, userProfile } = useAuth();
   const { addToast } = useToast();
 
@@ -48,6 +49,7 @@ export default function AdminReviewQueuePage() {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     const q = query(
       collection(db, 'review_queue'),
       where('status', '==', tab),
@@ -58,6 +60,11 @@ export default function AdminReviewQueuePage() {
       setLoading(false);
     }, (err) => {
       console.error('review_queue query failed:', err);
+      if (err.code === 'permission-denied') {
+        setError('Permission denied. Try logging out and back in to refresh your admin token.');
+      } else {
+        setError(`Query failed: ${err.message}`);
+      }
       setLoading(false);
     });
     return () => unsub();
@@ -154,6 +161,13 @@ export default function AdminReviewQueuePage() {
 
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+      ) : error ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-yellow-500" />
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+          </CardContent>
+        </Card>
       ) : requests.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">

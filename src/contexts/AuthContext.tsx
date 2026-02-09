@@ -134,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const tokenResult = await firebaseUser.getIdTokenResult();
+        const tokenResult = await firebaseUser.getIdTokenResult(true);
         setClaims(tokenResult.claims as any);
         // Update last login
         try {
