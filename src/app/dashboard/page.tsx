@@ -64,7 +64,7 @@ export default function DashboardPage() {
     );
     const unsubSessions = onSnapshot(sessionsQ, (snap) => {
       setSessions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ExamSession)));
-    }, () => {});
+    }, (err) => console.error('exam_sessions query failed:', err));
 
     // Load private questions
     const questionsQ = query(
@@ -74,7 +74,7 @@ export default function DashboardPage() {
     );
     const unsubQuestions = onSnapshot(questionsQ, (snap) => {
       setMyQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Question)));
-    }, () => {});
+    }, (err) => console.error('questions_private query failed:', err));
 
     // Load private notes
     const notesQ = query(
@@ -85,7 +85,7 @@ export default function DashboardPage() {
     );
     const unsubNotes = onSnapshot(notesQ, (snap) => {
       setMyNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Note)));
-    }, () => {});
+    }, (err) => console.error('notes query failed:', err));
 
     return () => { unsubSessions(); unsubQuestions(); unsubNotes(); };
   }, [user]);
