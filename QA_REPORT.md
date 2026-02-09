@@ -1,0 +1,350 @@
+# QA Report — Unime Informatica Static Code Audit
+
+**Date:** 2025-01-XX
+**Auditor:** Automated Static Analysis
+**Commit baseline:** `439048a` (pre-audit)
+**Fix commit:** `a72620a`
+**Scope:** Full codebase — security rules, RBAC, auth, signup, public profiles, presence, activity feed, practice engine, labs, hooks, routing, types
+
+---
+
+## Executive Summary
+
+This audit reviewed **30+ source files** across the entire Unime Informatica Next.js + Firebase stack. **8 critical bugs** were found and patched in commit `a72620a`. Several medium/low-severity issues are documented below with recommended follow-ups.
+
+### Patch Summary (commit `a72620a`)
+
+| # | File | Fix |
+|---|------|-----|
+| 1 | `firebase/firestore.rules` | Added missing rules for `exam_sessions`, `questions_private`, `audit_logs`; fixed `user_stats` write rule; fixed notes `authorUid` → `creatorId` |
+| 2 | `firebase/database.rules.json` | Added `'offline'` to allowed presence state values |
+| 3 | `src/lib/firebase/activity.ts` | Fixed collection name `audit_logs` → `audit_log` |
+| 4 | `src/lib/hooks/usePresence.ts` | Removed `role` from RTDB presence (info leak); replaced `onDisconnect.set('offline')` with `onDisconnect.remove()` |
+| 5 | `src/lib/hooks/useCourses.ts` | Fixed `useTopics` to read from top-level `topics` collection instead of nonexistent subcollection |
+| 6 | `src/app/admin/notes/page.tsx` | Changed `authorUid` → `creatorId` to match Firestore rules and TS type |
+| 7 | `src/app/admin/users/page.tsx` | Fixed `'student'` → `'user'` in role filter/dropdown; fixed `PromoteByUsername` to use `username_lower` |
+| 8 | `src/lib/types/index.ts` | Removed `role` from `PresenceData` interface |
+
+---
+
+## Section A — Security Rules
+
+### A1. Firestore Rules (`firebase/firestore.rules`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **No rule for `exam_sessions`** — practice session CRUD silently denied | 🔴 CRITICAL | ✅ FIXED |
+| **No rule for `questions_private`** — dashboard private questions silently denied | 🔴 CRITICAL | ✅ FIXED |
+| **`user_stats` write rule was `false`** — client stats update always fails (Cloud Functions not deployed) | 🔴 CRITICAL | ✅ FIXED |
+| **`audit_log` vs `audit_logs`** — audit logging collection name mismatch | 🔴 CRITICAL | ✅ FIXED (both code and rules) |
+| **Notes rule checked `authorUid` but dashboard saves `creatorId`** — owner can't edit own notes | 🟠 HIGH | ✅ FIXED |
+| Usernames collection `allow create: if isAuthenticated()` — any auth user can reserve any username | 🟡 MEDIUM | ⚠️ NOTED |
+| `activity_events` allows `create` by any authenticated user — could be spammed | 🟡 MEDIUM | ⚠️ NOTED |
+| No rule for `lab_sessions` update — users can't update lab progress | 🟡 MEDIUM | ⚠️ NOTED (add update rule when labs ship) |
+
+**Positive findings:**
+- Helper functions (`isAuthenticated`, `isAdmin`, `isOwner`, etc.) are well-structured
+- Moderator permission checks via `hasModPermission()` are granular
+- Default deny on unmatched paths (Firestore default)
+- `course_stats`, `daily_summaries` correctly deny client writes
+
+### A2. Realtime Database Rules (`firebase/database.rules.json`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **`onDisconnect` wrote `state: 'offline'` but rule only allowed `'online'\|'idle'`** — disconnect handler always fails, users stuck as "online" | 🔴 CRITICAL | ✅ FIXED |
+| **`role` was written to presence but not validated** — user role exposed to anyone (`.read: true`) | 🟠 HIGH | ✅ FIXED (removed from code) |
+| Presence `.read: true` per-uid — anyone can read who's online and what page they're on | 🟡 MEDIUM | ⚠️ NOTED |
+| No rate-limiting on presence writes | 🔵 LOW | ⚠️ NOTED |
+
+**Positive findings:**
+- Write restricted to `$uid === auth.uid` — users can only write own presence
+- Validation rules enforce data shape (`username`, `state`, `lastActive` required)
+- `typing` node properly scoped by room/uid
+
+### A3. Storage Rules (`firebase/storage.rules`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Notes allow any authenticated user to write to any `notes/{courseId}/` path | 🟡 MEDIUM | ⚠️ NOTED |
+| No file type validation on notes upload (only size limit) | 🟡 MEDIUM | ⚠️ NOTED |
+| Default deny (`/{allPaths=**}`) is correct | ✅ GOOD | — |
+
+**Positive findings:**
+- Labs restricted to admin/moderator only
+- Avatars restricted to own uid path with image content-type check and 5MB limit
+- Reasonable size limits (50MB notes, 100MB labs, 5MB avatars)
+
+---
+
+## Section B — Authentication & RBAC
+
+### B1. Firebase Init (`src/lib/firebase/config.ts`, `src/lib/firebase/admin.ts`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Client SDK init uses `getApps().length === 0` guard — prevents double-init | ✅ GOOD | — |
+| Admin SDK properly guards with `!getApps().length` | ✅ GOOD | — |
+| Admin SDK uses `FIREBASE_ADMIN_*` env vars (not `NEXT_PUBLIC_`) — no client leak | ✅ GOOD | — |
+| Admin SDK `privateKey?.replace(/\\n/g, '\n')` handles Heroku newline escaping | ✅ GOOD | — |
+
+### B2. AuthContext (`src/contexts/AuthContext.tsx`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **Signup race condition:** Auth account created BEFORE Firestore transaction. If transaction fails (username taken), orphaned Auth account persists. Auto-create profile mitigates but assigns generated username. | 🟠 HIGH | ⚠️ NOTED |
+| **No cleanup on failed signup:** If `runTransaction` throws after `createUserWithEmailAndPassword`, no `user.delete()` is called | 🟠 HIGH | ⚠️ NOTED |
+| Username reservation in transaction is atomic (good) | ✅ GOOD | — |
+| Bootstrap admin auto-upgrade writes `role: 'admin'` to Firestore on every login | 🟡 MEDIUM | ⚠️ NOTED (unnecessary writes) |
+| `checkUsernameAvailable` uses `getDoc` (not real-time) — TOCTOU gap with signup | 🔵 LOW | ⚠️ NOTED (transaction is the real guard) |
+| `lastLoginAt` update on every auth state change could fail for new signups (profile not yet created) — error is silently caught | 🔵 LOW | ⚠️ OK |
+
+### B3. Admin Layout (`src/app/admin/layout.tsx`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Dual check: `claims?.role` OR `userProfile?.role` — compensates for missing Cloud Functions claim sync | ✅ GOOD (workaround) | — |
+| Client-side redirect on `!hasAdminAccess` — but no server-side middleware | 🟡 MEDIUM | ⚠️ NOTED |
+| Returns `null` after redirect — prevents flash of admin content | ✅ GOOD | — |
+
+### B4. Navigation (`src/components/layout/Navigation.tsx`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Admin link shown for both `claims?.role` and `userProfile?.role` checks | ✅ GOOD | — |
+| Hides nav on `/admin` paths — avoids double navigation | ✅ GOOD | — |
+
+### B5. Admin Pages — RBAC Consistency
+
+All 16 admin sub-pages were reviewed. Key finding:
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Admin pages rely ONLY on layout-level auth check — no per-page permission verification | 🟡 MEDIUM | ⚠️ NOTED |
+| Moderator granular permissions (e.g., `canManageCourses`) are defined in types but NOT checked in individual admin pages | 🟠 HIGH | ⚠️ NOTED |
+| Admin users page correctly checks `isAdmin` before role changes | ✅ GOOD | — |
+| Admin users page prevents self-role-change | ✅ GOOD | — |
+
+**Recommendation:** Add per-page permission checks. Currently a moderator with only `canManageNotes` can access all admin pages.
+
+---
+
+## Section C — Signup & Username
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Username regex on input: `[^a-zA-Z0-9_]` stripped — good client validation | ✅ GOOD | — |
+| Min 3 / Max 20 characters enforced in HTML | ✅ GOOD | — |
+| **No server-side username validation** — malicious client could bypass regex | 🟡 MEDIUM | ⚠️ NOTED |
+| Username stored both original case and `username_lower` — consistent | ✅ GOOD | — |
+| Debounced availability check (500ms) — good UX | ✅ GOOD | — |
+| **Firestore `usernames` collection allows any authenticated user to `create`** — an attacker could squat usernames | 🟡 MEDIUM | ⚠️ NOTED |
+
+---
+
+## Section D — Public Profiles (`/u/[username]`)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| `publicProfile: false` check prevents display — privacy respected | ✅ GOOD | — |
+| `showDisplayName`, `showContributions` granular privacy flags | ✅ GOOD | — |
+| **Query on `users` collection requires `isAuthenticated()`** — unauthenticated visitors get permission denied, profile page fails silently | 🟠 HIGH | ⚠️ NOTED |
+| Contributions query correctly filters `status: 'published'` only | ✅ GOOD | — |
+| Error case shows generic "Profile Not Found" — no info leak | ✅ GOOD | — |
+
+**Recommendation:** Either make `users` collection read public (only expose safe fields via a `publicProfiles` collection) or add auth check in UI with login prompt.
+
+---
+
+## Section E — Presence System
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **Role leaked to RTDB** — any user could see admin/mod roles | 🟠 HIGH | ✅ FIXED |
+| **onDisconnect wrote invalid state** — users stuck as "online" forever | 🔴 CRITICAL | ✅ FIXED |
+| Heartbeat every 30s keeps presence fresh | ✅ GOOD | — |
+| `useOnlineUsers` correctly reads from RTDB with real-time listener | ✅ GOOD | — |
+| 2-minute recent-users window is reasonable | ✅ GOOD | — |
+| `currentPath` exposed to all (shows what page each user is on) | 🔵 LOW | ⚠️ NOTED |
+
+---
+
+## Section F — Activity Feed & Audit
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **`audit_logs` vs `audit_log` collection mismatch** — all audit writes silently failed | 🔴 CRITICAL | ✅ FIXED |
+| `logActivity` silently swallows errors with `console.error` — good for non-blocking, but audit failures are invisible | 🟡 MEDIUM | ⚠️ NOTED |
+| Activity events include `actorUid`, `actorUsername`, `actorRole`, `metadata` — comprehensive | ✅ GOOD | — |
+| `useActivityFeed` correctly filters by `visibility: 'admin'` | ✅ GOOD | — |
+| Audit log page has category/action/search filters — good admin UX | ✅ GOOD | — |
+
+---
+
+## Section G — Practice Engine
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **No Firestore rule for `exam_sessions`** — entire practice system broken | 🔴 CRITICAL | ✅ FIXED |
+| **`user_stats` writes always denied** — stats never persist | 🔴 CRITICAL | ✅ FIXED |
+| Old-format option normalization (`{A,B,C,D}` → `MCQOption[]`) works correctly | ✅ GOOD | — |
+| Fallback query for questions without `status` field — handles legacy data | ✅ GOOD | — |
+| `Math.random() - 0.5` shuffle is not cryptographically uniform | 🔵 LOW | ⚠️ OK for this use case |
+| `submitSession` updates `exam_sessions` then `user_stats` — not atomic | 🟡 MEDIUM | ⚠️ NOTED |
+| Session resume via `?resume=` param loads saved answers/index | ✅ GOOD | — |
+| Wrapped in `Suspense` for `useSearchParams()` — Next.js compatible | ✅ GOOD | — |
+| Score is `Math.round((correct / total) * 100)` — standard rounding | ✅ GOOD | — |
+| Answers stored per-question with `timeSpentSeconds` — detailed analytics | ✅ GOOD | — |
+
+---
+
+## Section H — Labs & CSV
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| No CSV parsing/sanitization on upload — CSV injection possible if data is later rendered in formulas | 🟡 MEDIUM | ⚠️ NOTED |
+| Dataset upload restricted to admin/moderator in Storage rules | ✅ GOOD | — |
+| Lab questions use `{ A: '', B: '', C: '', D: '' }` format (different from practice MCQ) — intentional for labs | 🔵 LOW | ⚠️ NOTED |
+| `papaparse` is in dependencies but no client-side CSV parsing was found | 🔵 INFO | — |
+
+---
+
+## Section I — SSR, Hooks & Routing
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| `export const dynamic = 'force-dynamic'` in root layout — correct for Firebase runtime env vars | ✅ GOOD | — |
+| All pages use `'use client'` — no accidental SSR of Firebase client SDK | ✅ GOOD | — |
+| `useTopics` queried subcollection instead of top-level collection | 🔴 CRITICAL | ✅ FIXED |
+| `useCourses` has fallback error handler for missing indexes | ✅ GOOD | — |
+| `useCourseBySlug` has fallback for missing composite index | ✅ GOOD | — |
+| No hook called conditionally (React rules respected) | ✅ GOOD | — |
+| `PresenceWrapper` renders `null` — minimal footprint | ✅ GOOD | — |
+
+---
+
+## Section J — XSS & Injection
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **5 uses of `dangerouslySetInnerHTML`** in courses pages (`whatYouLearn`, `syllabus`, `examInfo`, `recommendedResources`) | 🟠 HIGH | ⚠️ NOTED |
+| HTML content is admin-authored (only admins can create/edit courses) — mitigated by trust boundary | 🟡 MEDIUM | — |
+| No DOMPurify or sanitization library in dependencies | 🟡 MEDIUM | ⚠️ NOTED |
+
+**Recommendation:** Install `dompurify` and sanitize all HTML before rendering. Even admin-authored content should be sanitized to prevent stored XSS.
+
+---
+
+## Section K — Cloud Functions (NOT DEPLOYED)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| **`onRoleChange` not deployed** — custom claims never sync when roles change in Firestore | 🟠 HIGH | ⚠️ NOTED |
+| **`onUserCreated` sets `role: 'student'`** but `UserRole` type defines `'user'` — mismatch | 🟡 MEDIUM | ⚠️ NOTED |
+| `bootstrapAdmin` function exists but wasn't needed — client-side bootstrap workaround in use | 🔵 INFO | — |
+| `cleanupPresence` scheduled function would help with stale entries — not deployed | 🟡 MEDIUM | ⚠️ NOTED |
+
+**Recommendation:** Deploy Cloud Functions to Firebase, or implement an API route to sync custom claims when roles change.
+
+---
+
+## Section L — Type Safety & Code Quality
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| `UserRole = 'admin' \| 'moderator' \| 'user'` but some code references `'student'` | 🟡 MEDIUM | ✅ FIXED (admin users page) |
+| `PresenceData` had `role` field that was removed from code | 🟡 MEDIUM | ✅ FIXED |
+| `DifficultyLevel = 'easy' \| 'medium' \| 'hard' \| 1 \| 2 \| 3 \| 4 \| 5` — union type, handled correctly throughout | ✅ GOOD | — |
+| Many admin page components use `any` for user/userProfile/addToast props | 🔵 LOW | ⚠️ NOTED |
+| `i18n` uses static `t()` function (not a hook) — consistent | ✅ GOOD | — |
+
+---
+
+## Top 10 Risks to Watch in Production
+
+| # | Risk | Impact | Likelihood | Mitigation |
+|---|------|--------|------------|------------|
+| **1** | **Cloud Functions not deployed** — role changes via Firestore don't sync to custom claims. Firestore security rules that check `request.auth.token.role` are stale. | HIGH | CERTAIN | Deploy Cloud Functions or create a Next.js API route (`/api/sync-claims`) that uses Admin SDK to update claims on role change |
+| **2** | **Signup orphaned Auth accounts** — if Firestore transaction fails after Auth creation, orphaned Firebase Auth accounts accumulate | MEDIUM | LIKELY | Add `try/catch` around signup that calls `cred.user.delete()` on transaction failure |
+| **3** | **XSS via `dangerouslySetInnerHTML`** — course HTML fields rendered without sanitization. If an admin account is compromised, stored XSS affects all users | HIGH | LOW (requires admin compromise) | Install `dompurify`, sanitize all HTML fields before rendering |
+| **4** | **Moderator permission checks not enforced per-page** — any moderator (even with no permissions) can access all 16 admin pages | MEDIUM | LIKELY | Add `useModPermission()` hook and check permissions in each admin page |
+| **5** | **Public profiles fail for unauthenticated visitors** — Firestore `users` read requires auth, so `/u/[username]` pages break for logged-out users | MEDIUM | CERTAIN | Create a `public_profiles` collection with limited fields or update `users` read rule |
+| **6** | **Username squatting** — `usernames` collection allows any authenticated user to create entries. A malicious user could reserve popular usernames | LOW | POSSIBLE | Add Firestore rule: `allow create: if isAuthenticated() && !exists(/databases/$(database)/documents/usernames/$(username))` (already partially mitigated by transaction) |
+| **7** | **No rate limiting on Firestore writes** — `activity_events`, `exam_sessions`, `attempts` can be spammed by authenticated users | MEDIUM | POSSIBLE | Deploy App Check or use Cloud Functions with rate limiting |
+| **8** | **Presence data leaks browsing path** — `currentPath` is publicly readable in RTDB, showing which page each user is on | LOW | CERTAIN | Consider removing `currentPath` from presence or restricting reads to admin |
+| **9** | **Non-atomic practice session submission** — `submitSession` updates `exam_sessions` then `user_stats` separately. If the second write fails, stats are inconsistent | MEDIUM | UNLIKELY | Use Firestore batch write or accept eventual consistency |
+| **10** | **`postinstall: next build`** in package.json — every `npm install` triggers a full build. Slow CI/CD and unexpected build failures on dependency install | LOW | CERTAIN | Move build to an explicit build step in CI, or use `heroku-postbuild` instead |
+
+---
+
+## Files Reviewed (32 total)
+
+### Security Rules
+- `firebase/firestore.rules` ✅
+- `firebase/database.rules.json` ✅
+- `firebase/storage.rules` ✅
+
+### Firebase Client
+- `src/lib/firebase/config.ts` ✅
+- `src/lib/firebase/admin.ts` ✅
+- `src/lib/firebase/activity.ts` ✅
+
+### Auth & Context
+- `src/contexts/AuthContext.tsx` ✅
+
+### Admin Pages (16)
+- `src/app/admin/layout.tsx` ✅
+- `src/app/admin/page.tsx` ✅
+- `src/app/admin/courses/page.tsx` ✅
+- `src/app/admin/topics/page.tsx` ✅
+- `src/app/admin/notes/page.tsx` ✅
+- `src/app/admin/questions/page.tsx` ✅
+- `src/app/admin/review-queue/page.tsx` ✅
+- `src/app/admin/labs/page.tsx` ✅
+- `src/app/admin/practice-settings/page.tsx` ✅
+- `src/app/admin/users/page.tsx` ✅
+- `src/app/admin/announcements/page.tsx` ✅
+- `src/app/admin/feature-flags/page.tsx` ✅
+- `src/app/admin/audit-log/page.tsx` ✅
+- `src/app/admin/settings/page.tsx` ✅
+- `src/app/admin/analytics/page.tsx` ✅
+- `src/app/admin/monetization/page.tsx` ✅
+
+### Public Pages
+- `src/app/(auth)/login/page.tsx` ✅
+- `src/app/(auth)/signup/page.tsx` ✅
+- `src/app/courses/page.tsx` ✅
+- `src/app/courses/[slug]/page.tsx` ✅
+- `src/app/dashboard/page.tsx` ✅
+- `src/app/profile/page.tsx` ✅
+- `src/app/practice/session/page.tsx` ✅
+- `src/app/u/[username]/page.tsx` ✅
+
+### Hooks & Utilities
+- `src/lib/hooks/useCourses.ts` ✅
+- `src/lib/hooks/usePresence.ts` ✅
+- `src/lib/hooks/useOnlineUsers.ts` ✅
+- `src/lib/hooks/useActivityFeed.ts` ✅
+- `src/lib/utils/index.ts` ✅
+- `src/lib/types/index.ts` ✅
+
+### Layout & Components
+- `src/app/layout.tsx` ✅
+- `src/components/layout/Navigation.tsx` ✅
+- `src/components/layout/PresenceWrapper.tsx` ✅
+
+### Infrastructure
+- `firebase/functions/src/index.ts` ✅
+- `next.config.js` ✅
+- `package.json` ✅
+
+---
+
+## Glossary
+
+- 🔴 **CRITICAL** — Feature is broken or data is exposed
+- 🟠 **HIGH** — Significant security gap or reliability issue
+- 🟡 **MEDIUM** — Correctness issue or missing defense-in-depth
+- 🔵 **LOW / INFO** — Minor issue or improvement opportunity
+- ✅ **FIXED** — Patched in commit `a72620a`
+- ⚠️ **NOTED** — Documented for manual follow-up
