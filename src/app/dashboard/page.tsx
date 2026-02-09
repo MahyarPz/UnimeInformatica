@@ -114,8 +114,20 @@ export default function DashboardPage() {
     try {
       await addDoc(collection(db, 'review_queue'), {
         questionId: question.id,
-        question,
+        questionData: {
+          questionText: question.questionText,
+          type: question.type,
+          options: question.options || null,
+          correctIndex: question.correctIndex ?? null,
+          explanation: question.explanation || '',
+          hints: question.hints || [],
+          difficulty: question.difficulty,
+          tags: question.tags || [],
+          courseId: question.courseId,
+          topicId: question.topicId || null,
+        },
         submitterId: user.uid,
+        submitterUid: user.uid,
         submitterUsername: userProfile.username,
         courseId: question.courseId,
         topicId: question.topicId || null,

@@ -47,13 +47,17 @@ export default function AdminReviewQueuePage() {
   }, []);
 
   useEffect(() => {
+    setLoading(true);
     const q = query(
       collection(db, 'review_queue'),
       where('status', '==', tab),
-      orderBy('submittedAt', tab === 'pending' ? 'asc' : 'desc')
+      orderBy('createdAt', tab === 'pending' ? 'asc' : 'desc')
     );
     const unsub = onSnapshot(q, (snap) => {
       setRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ReviewRequest)));
+      setLoading(false);
+    }, (err) => {
+      console.error('review_queue query failed:', err);
       setLoading(false);
     });
     return () => unsub();
@@ -210,7 +214,7 @@ function ReviewCard({
             </div>
             <p className="text-sm font-medium">{q?.questionText || 'No text'}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              by @{request.submitterUsername} • {request.submittedAt ? timeAgo(request.submittedAt) : 'just now'}
+              by @{request.submitterUsername} • {request.createdAt ? timeAgo(request.createdAt) : 'just now'}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
