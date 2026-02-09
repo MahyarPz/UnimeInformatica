@@ -48,6 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [claims, setClaims] = useState<{ role?: UserRole } | null>(null);
 
+  const bootstrapEmail = process.env.NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL || '';
+
+  const isBootstrapAdmin = useCallback((email: string) => {
+    return bootstrapEmail && email.toLowerCase() === bootstrapEmail.toLowerCase();
+  }, [bootstrapEmail]);
+
   const fetchProfile = useCallback(async (uid: string) => {
     try {
       const docRef = doc(db, 'users', uid);
@@ -75,7 +81,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        await fetchProfile(firebaseUser.uid);
+        let profile = await fetchProfile(firebaseUser.uid);
+
+        // Auto-create profile if missing (handles orphaned Auth accounts)
+        if (!profile && firebaseUser.email) {
+          try {
+            const email = firebaseUser.email;
+            const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+            const defaultUsername = baseUsername + '_' + firebaseUser.uid.substring(0, 4);
+            const role = isBootstrapAdmin(email) ? 'admin' : 'user';
+
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await setDoc(userRef, {
+              email: email,
+              username: defaultUsername,
+              username_lower: defaultUsername.toLowerCase(),
+              firstName: '',
+              lastName: '',
+              phone: '',
+              role: role as UserRole,
+              publicProfile: true,
+              showDisplayName: false,
+              showContributions: true,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              lastLoginAt: serverTimestamp(),
+              streak: 0,
+              goals: {
+                dailyQuestions: 10,
+                weeklyPracticeMinutes: 120,
+                targetScore: 80,
+              },
+            });
+            console.log('Auto-created profile for', email, 'with role', role);
+            profile = await fetchProfile(firebaseUser.uid);
+          } catch (e) {
+            console.error('Error auto-creating profile:', e);
+          }
+        }
+
+        // If bootstrap admin but role is not admin, upgrade it
+        if (profile && firebaseUser.email && isBootstrapAdmin(firebaseUser.email) && profile.role !== 'admin') {
+          try {
+            await updateDoc(doc(db, 'users', firebaseUser.uid), {
+              role: 'admin' as UserRole,
+              updatedAt: serverTimestamp(),
+            });
+            profile = await fetchProfile(firebaseUser.uid);
+            console.log('Upgraded bootstrap admin role');
+          } catch (e) {
+            console.error('Error upgrading admin role:', e);
+          }
+        }
+
         const tokenResult = await firebaseUser.getIdTokenResult();
         setClaims(tokenResult.claims as any);
         // Update last login
@@ -93,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [fetchProfile]);
+  }, [fetchProfile, isBootstrapAdmin]);
 
   const checkUsernameAvailable = async (username: string): Promise<boolean> => {
     const lower = username.toLowerCase().trim();
@@ -126,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Create user profile
       const userRef = doc(db, 'users', cred.user.uid);
+      const assignedRole = isBootstrapAdmin(data.email) ? 'admin' : 'user';
       transaction.set(userRef, {
         email: data.email,
         username: data.username.trim(),
@@ -133,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         firstName: data.firstName || '',
         lastName: data.lastName || '',
         phone: data.phone || '',
-        role: 'user' as UserRole,
+        role: assignedRole as UserRole,
         publicProfile: true,
         showDisplayName: false,
         showContributions: true,

@@ -39,8 +39,8 @@ export function Navigation() {
   const { user, userProfile, claims, logout } = useAuth();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isAdmin = claims?.role === 'admin';
-  const isMod = claims?.role === 'moderator';
+  const isAdmin = claims?.role === 'admin' || userProfile?.role === 'admin';
+  const isMod = claims?.role === 'moderator' || userProfile?.role === 'moderator';
 
   // Don't show nav on admin pages (admin has its own layout)
   if (pathname?.startsWith('/admin')) return null;

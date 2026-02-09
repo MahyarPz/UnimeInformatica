@@ -54,16 +54,19 @@ const adminModules = [
 ] as const;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, claims, loading } = useAuth();
+  const { user, userProfile, claims, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const hasAdminAccess = claims?.role === 'admin' || claims?.role === 'moderator' ||
+    userProfile?.role === 'admin' || userProfile?.role === 'moderator';
+
   useEffect(() => {
-    if (!loading && (!user || (claims?.role !== 'admin' && claims?.role !== 'moderator'))) {
+    if (!loading && (!user || !hasAdminAccess)) {
       router.push('/');
     }
-  }, [user, claims, loading, router]);
+  }, [user, hasAdminAccess, loading, router]);
 
   if (loading) {
     return (
@@ -73,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!user || (claims?.role !== 'admin' && claims?.role !== 'moderator')) {
+  if (!user || !hasAdminAccess) {
     return null;
   }
 
