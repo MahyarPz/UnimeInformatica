@@ -134,8 +134,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const tokenResult = await firebaseUser.getIdTokenResult(true);
-        setClaims(tokenResult.claims as any);
+        try {
+          const tokenResult = await firebaseUser.getIdTokenResult(true);
+          setClaims(tokenResult.claims as any);
+        } catch (e) {
+          console.error('Token refresh failed, using cached token:', e);
+          try {
+            const tokenResult = await firebaseUser.getIdTokenResult(false);
+            setClaims(tokenResult.claims as any);
+          } catch {
+            setClaims(null);
+          }
+        }
         // Update last login
         try {
           await updateDoc(doc(db, 'users', firebaseUser.uid), {

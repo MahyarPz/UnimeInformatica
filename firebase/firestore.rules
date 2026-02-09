@@ -81,9 +81,10 @@ service cloud.firestore {
 
     // ─── Private Questions (top-level) ────────────────────
     match /questions_private/{questionId} {
-      allow read: if isOwner(resource.data.creatorId);
+      allow read: if isOwner(resource.data.creatorId) || isAdminOrMod();
       allow create: if isAuthenticated();
-      allow update, delete: if isOwner(resource.data.creatorId);
+      allow update: if isOwner(resource.data.creatorId) || isAdmin() || hasModPermission('canReviewQuestions');
+      allow delete: if isOwner(resource.data.creatorId);
     }
 
     // ─── Review Queue ─────────────────────────────────────

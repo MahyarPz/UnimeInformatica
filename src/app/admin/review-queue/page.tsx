@@ -91,6 +91,18 @@ export default function AdminReviewQueuePage() {
         reviewedAt: serverTimestamp(),
       });
 
+      // Update user's private question status
+      if (request.questionId) {
+        try {
+          await updateDoc(doc(db, 'questions_private', request.questionId), {
+            status: 'approved',
+            updatedAt: serverTimestamp(),
+          });
+        } catch (e) {
+          console.error('Could not update private question status:', e);
+        }
+      }
+
       await logAudit({
         action: 'question_approved',
         category: 'questions',
@@ -115,6 +127,19 @@ export default function AdminReviewQueuePage() {
         reviewedAt: serverTimestamp(),
         feedback,
       });
+
+      // Update user's private question status so they see the rejection
+      if (request.questionId) {
+        try {
+          await updateDoc(doc(db, 'questions_private', request.questionId), {
+            status: 'rejected',
+            reviewFeedback: feedback,
+            updatedAt: serverTimestamp(),
+          });
+        } catch (e) {
+          console.error('Could not update private question status:', e);
+        }
+      }
 
       await logAudit({
         action: 'question_rejected',
@@ -238,11 +263,11 @@ function ReviewCard({
 
         {expanded && (
           <div className="mt-3 pt-3 border-t space-y-2 text-sm">
-            {q?.type === 'mcq' && q?.options && (
+            {q?.type === 'mcq' && q?.options && Array.isArray(q.options) && (
               <div className="space-y-1">
-                {Object.entries(q.options).map(([key, val]) => (
-                  <div key={key} className={`px-2 py-1 rounded text-sm ${key === q.correctAnswer ? 'bg-green-50 font-medium text-green-700' : 'bg-muted'}`}>
-                    <strong>{key}.</strong> {val as string}
+                {q.options.map((opt: any, idx: number) => (
+                  <div key={idx} className={`px-2 py-1 rounded text-sm ${(opt.isCorrect || idx === q.correctIndex) ? 'bg-green-50 font-medium text-green-700' : 'bg-muted'}`}>
+                    <strong>{String.fromCharCode(65 + idx)}.</strong> {typeof opt === 'string' ? opt : opt.text}
                   </div>
                 ))}
               </div>

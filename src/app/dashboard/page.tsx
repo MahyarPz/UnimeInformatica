@@ -19,6 +19,7 @@ import {
   Send,
   Eye,
   EyeOff,
+  Edit,
   Loader2,
 } from 'lucide-react';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
@@ -287,19 +288,53 @@ export default function DashboardPage() {
                 ) : (
                   <div className="space-y-3">
                     {myQuestions.map((q) => (
-                      <div key={q.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm truncate">{q.questionText}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">{q.type}</Badge>
-                            <Badge variant="outline" className="text-xs">{q.status}</Badge>
-                            <span className="text-xs text-muted-foreground">{formatDate(q.createdAt)}</span>
+                      <div key={q.id} className="p-3 rounded-lg bg-muted/50 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{q.questionText}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs">{q.type}</Badge>
+                              <Badge className={`text-xs ${
+                                q.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                q.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                q.status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' :
+                                ''
+                              }`} variant="outline">{q.status === 'pending_review' ? 'Under Review' : q.status}</Badge>
+                              <span className="text-xs text-muted-foreground">{formatDate(q.createdAt)}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {(q.status === 'draft' || q.status === 'rejected') && (
+                              <EditQuestionDialog question={q} courses={courses} onSubmit={async (data) => {
+                                try {
+                                  await updateDoc(doc(db, 'questions_private', q.id), { ...data, updatedAt: serverTimestamp() });
+                                  addToast({ title: 'Question updated!', variant: 'success' });
+                                } catch { addToast({ title: 'Failed to update', variant: 'destructive' }); }
+                              }} />
+                            )}
+                            {q.status === 'draft' && (
+                              <Button size="sm" variant="outline" onClick={() => submitForReview(q)}>
+                                <Send className="h-3 w-3 mr-1" /> Submit
+                              </Button>
+                            )}
+                            {q.status === 'rejected' && (
+                              <Button size="sm" variant="outline" onClick={() => {
+                                updateDoc(doc(db, 'questions_private', q.id), { status: 'draft', updatedAt: serverTimestamp() });
+                              }}>
+                                Resubmit
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        {q.status === 'draft' && (
-                          <Button size="sm" variant="outline" onClick={() => submitForReview(q)}>
-                            <Send className="h-3 w-3 mr-1" /> Submit
-                          </Button>
+                        {q.status === 'rejected' && (q as any).reviewFeedback && (
+                          <div className="bg-red-50 p-2 rounded text-xs text-red-700">
+                            <strong>Feedback:</strong> {(q as any).reviewFeedback}
+                          </div>
+                        )}
+                        {q.status === 'approved' && (
+                          <div className="bg-green-50 p-2 rounded text-xs text-green-700">
+                            ✅ This question has been approved and added to the public pool!
+                          </div>
                         )}
                       </div>
                     ))}
@@ -508,6 +543,88 @@ function CreateQuestionDialog({ courses, onSubmit }: { courses: any[]; onSubmit:
               explanation,
               tags: [],
             })}>Create</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditQuestionDialog({ question, courses, onSubmit }: { question: Question; courses: any[]; onSubmit: (data: any) => void }) {
+  const [text, setText] = useState(question.questionText || '');
+  const [type, setType] = useState<'mcq' | 'essay'>(question.type as any || 'mcq');
+  const [courseId, setCourseId] = useState(question.courseId || '');
+  const [difficulty, setDifficulty] = useState(question.difficulty || 'medium');
+  const [options, setOptions] = useState(
+    question.options?.map((o: any) => typeof o === 'string' ? o : o.text) || ['', '', '', '']
+  );
+  const [correctIdx, setCorrectIdx] = useState(
+    question.correctIndex ?? question.options?.findIndex((o: any) => o.isCorrect) ?? 0
+  );
+  const [explanation, setExplanation] = useState(question.explanation || '');
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="ghost"><Edit className="h-3 w-3" /></Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Edit Question</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Course</Label>
+            <Select value={courseId} onValueChange={setCourseId}>
+              <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
+              <SelectContent>{courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Type</Label>
+            <Select value={type} onValueChange={(v: any) => setType(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mcq">Multiple Choice</SelectItem>
+                <SelectItem value="essay">Essay</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Difficulty</Label>
+            <Select value={difficulty} onValueChange={setDifficulty}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="easy">Easy</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="hard">Hard</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label>Question Text</Label><Textarea value={text} onChange={(e) => setText(e.target.value)} /></div>
+          {type === 'mcq' && (
+            <div className="space-y-2">
+              <Label>Options</Label>
+              {options.map((opt: string, i: number) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input type="radio" name="editCorrect" checked={correctIdx === i} onChange={() => setCorrectIdx(i)} />
+                  <Input value={opt} onChange={(e) => { const o = [...options]; o[i] = e.target.value; setOptions(o); }} placeholder={`Option ${i + 1}`} />
+                </div>
+              ))}
+            </div>
+          )}
+          <div><Label>Explanation</Label><Textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} /></div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose asChild>
+            <Button onClick={() => onSubmit({
+              questionText: text,
+              type,
+              courseId,
+              difficulty,
+              options: type === 'mcq' ? options.map((text: string, i: number) => ({ text, isCorrect: i === correctIdx })) : undefined,
+              correctIndex: type === 'mcq' ? correctIdx : undefined,
+              explanation,
+            })}>Save Changes</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
