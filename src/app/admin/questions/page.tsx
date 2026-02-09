@@ -250,6 +250,7 @@ function QuestionFormDialog({
   const handleCreate = async () => {
     if (!questionText || !courseId) return;
     try {
+      const correctMap: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
       const data: any = {
         type,
         courseId,
@@ -257,17 +258,25 @@ function QuestionFormDialog({
         difficulty: parseInt(difficulty),
         questionText,
         explanation: explanation || null,
-        hint: hint || null,
-        authorUid: user.uid,
-        authorUsername: userProfile.username,
+        hints: hint ? [hint] : [],
+        tags: [],
+        isPublic: true,
+        status: 'published',
+        creatorId: user.uid,
+        creatorUsername: userProfile?.username || '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
       if (type === 'mcq') {
-        data.options = { A: optionA, B: optionB, C: optionC, D: optionD };
-        data.correctAnswer = correctAnswer;
+        const allOptions = [optionA, optionB, optionC, optionD];
+        const correctIdx = correctMap[correctAnswer] ?? 0;
+        data.options = allOptions.map((text, idx) => ({
+          text,
+          isCorrect: idx === correctIdx,
+        }));
+        data.correctIndex = correctIdx;
       } else {
-        data.rubric = rubric || null;
+        data.rubric = rubric ? rubric.split('\n').filter(Boolean) : [];
       }
       await addDoc(collection(db, 'questions_public'), data);
       addToast({ title: 'Question created!', variant: 'success' });

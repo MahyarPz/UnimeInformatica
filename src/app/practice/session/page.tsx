@@ -66,21 +66,62 @@ function PracticeSessionInner() {
             const qDocs = await Promise.all(
               session.questionIds.map((qid) => getDoc(doc(db, 'questions_public', qid)))
             );
-            setQuestions(qDocs.filter((d) => d.exists()).map((d) => ({ id: d.id, ...d.data() } as Question)));
+            const loadedQs = qDocs.filter((d) => d.exists()).map((d) => {
+              const raw = d.data() as any;
+              const question: Question = { id: d.id, ...raw } as Question;
+              // Normalize old-format options
+              if (question.type === 'mcq' && question.options && !Array.isArray(question.options)) {
+                const optObj = question.options as any;
+                const keys = ['A', 'B', 'C', 'D'].filter((k) => optObj[k] !== undefined);
+                const correctKey = raw.correctAnswer || 'A';
+                question.options = keys.map((k) => ({ text: optObj[k], isCorrect: k === correctKey }));
+                question.correctIndex = keys.indexOf(correctKey);
+              }
+              return question;
+            });
+            setQuestions(loadedQs);
             setLoading(false);
             return;
           }
         }
 
         // Load questions based on mode
+        // First try with status filter, fallback to all questions for the course
         let q = query(
           collection(db, 'questions_public'),
           where('courseId', '==', courseId),
           where('status', '==', 'published')
         );
 
-        const snapshot = await getDocs(q);
-        let allQuestions = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Question));
+        let snapshot = await getDocs(q);
+
+        // Fallback: if no published questions, load all questions for this course
+        if (snapshot.empty) {
+          q = query(
+            collection(db, 'questions_public'),
+            where('courseId', '==', courseId)
+          );
+          snapshot = await getDocs(q);
+        }
+
+        let allQuestions = snapshot.docs.map((d) => {
+          const raw = d.data() as any;
+          const question: Question = { id: d.id, ...raw } as Question;
+
+          // Normalize old-format options { A: "...", B: "...", ... } → MCQOption[]
+          if (question.type === 'mcq' && question.options && !Array.isArray(question.options)) {
+            const optObj = question.options as any;
+            const keys = ['A', 'B', 'C', 'D'].filter((k) => optObj[k] !== undefined);
+            const correctKey = raw.correctAnswer || 'A';
+            question.options = keys.map((k) => ({
+              text: optObj[k],
+              isCorrect: k === correctKey,
+            }));
+            question.correctIndex = keys.indexOf(correctKey);
+          }
+
+          return question;
+        });
 
         // Shuffle
         allQuestions = allQuestions.sort(() => Math.random() - 0.5);
