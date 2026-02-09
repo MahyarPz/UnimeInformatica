@@ -222,8 +222,9 @@ function NoteUploadDialog({
       setTags('');
       setFile(null);
       setProgress(0);
-    } catch (error) {
-      addToast({ title: 'Upload failed', variant: 'destructive' });
+    } catch (error: any) {
+      console.error('Note upload failed:', error);
+      addToast({ title: 'Upload failed', description: error?.message || 'Check console for details', variant: 'destructive' });
     } finally {
       setUploading(false);
     }

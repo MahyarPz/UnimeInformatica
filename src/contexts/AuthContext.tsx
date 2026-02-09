@@ -167,46 +167,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Create Firebase Auth account
     const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
 
-    // Atomically reserve username using a transaction
-    await runTransaction(db, async (transaction) => {
-      const usernameRef = doc(db, 'usernames', usernameLower);
-      const usernameDoc = await transaction.get(usernameRef);
+    try {
+      // Atomically reserve username using a transaction
+      await runTransaction(db, async (transaction) => {
+        const usernameRef = doc(db, 'usernames', usernameLower);
+        const usernameDoc = await transaction.get(usernameRef);
 
-      if (usernameDoc.exists()) {
-        throw new Error('Username is already taken. Please choose another.');
+        if (usernameDoc.exists()) {
+          throw new Error('Username is already taken. Please choose another.');
+        }
+
+        // Reserve username
+        transaction.set(usernameRef, {
+          uid: cred.user.uid,
+          createdAt: serverTimestamp(),
+        });
+
+        // Create user profile
+        const userRef = doc(db, 'users', cred.user.uid);
+        const assignedRole = isBootstrapAdmin(data.email) ? 'admin' : 'user';
+        transaction.set(userRef, {
+          email: data.email,
+          username: data.username.trim(),
+          username_lower: usernameLower,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          phone: data.phone || '',
+          role: assignedRole as UserRole,
+          publicProfile: true,
+          showDisplayName: false,
+          showContributions: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+          streak: 0,
+          goals: {
+            dailyQuestions: 10,
+            weeklyPracticeMinutes: 120,
+            targetScore: 80,
+          },
+        });
+      });
+    } catch (error) {
+      // Transaction failed — delete the orphaned Auth account to prevent inconsistency
+      try {
+        await cred.user.delete();
+      } catch (deleteError) {
+        console.error('Failed to clean up orphaned Auth account:', deleteError);
       }
-
-      // Reserve username
-      transaction.set(usernameRef, {
-        uid: cred.user.uid,
-        createdAt: serverTimestamp(),
-      });
-
-      // Create user profile
-      const userRef = doc(db, 'users', cred.user.uid);
-      const assignedRole = isBootstrapAdmin(data.email) ? 'admin' : 'user';
-      transaction.set(userRef, {
-        email: data.email,
-        username: data.username.trim(),
-        username_lower: usernameLower,
-        firstName: data.firstName || '',
-        lastName: data.lastName || '',
-        phone: data.phone || '',
-        role: assignedRole as UserRole,
-        publicProfile: true,
-        showDisplayName: false,
-        showContributions: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
-        streak: 0,
-        goals: {
-          dailyQuestions: 10,
-          weeklyPracticeMinutes: 120,
-          targetScore: 80,
-        },
-      });
-    });
+      throw error; // Re-throw so the caller (signup page) sees the error
+    }
 
     // Fetch profile
     await fetchProfile(cred.user.uid);

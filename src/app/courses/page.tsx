@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import { BookOpen, ChevronRight, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -80,7 +81,7 @@ export default function CoursesPage() {
                       <AccordionContent>
                         <div
                           className="prose-content text-sm text-muted-foreground"
-                          dangerouslySetInnerHTML={{ __html: course.whatYouLearn || 'Content coming soon.' }}
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.whatYouLearn || 'Content coming soon.') }}
                         />
                       </AccordionContent>
                     </AccordionItem>

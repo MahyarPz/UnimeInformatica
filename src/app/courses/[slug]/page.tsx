@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import {
   BookOpen,
   FileText,
@@ -102,7 +103,7 @@ export default function CourseDetailPage() {
                       <CardTitle>{t('courses.syllabus')}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="prose-content" dangerouslySetInnerHTML={{ __html: course.syllabus }} />
+                      <div className="prose-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.syllabus) }} />
                     </CardContent>
                   </Card>
                 )}
@@ -112,7 +113,7 @@ export default function CourseDetailPage() {
                       <CardTitle>{t('courses.examInfo')}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="prose-content" dangerouslySetInnerHTML={{ __html: course.examInfo }} />
+                      <div className="prose-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.examInfo) }} />
                     </CardContent>
                   </Card>
                 )}
@@ -132,7 +133,7 @@ export default function CourseDetailPage() {
                       <CardTitle className="text-lg">{t('courses.whatYouLearn')}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="prose-content text-sm" dangerouslySetInnerHTML={{ __html: course.whatYouLearn }} />
+                      <div className="prose-content text-sm" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.whatYouLearn) }} />
                     </CardContent>
                   </Card>
                 )}
@@ -142,7 +143,7 @@ export default function CourseDetailPage() {
                       <CardTitle className="text-lg">{t('courses.resources')}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="prose-content text-sm" dangerouslySetInnerHTML={{ __html: course.recommendedResources }} />
+                      <div className="prose-content text-sm" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.recommendedResources) }} />
                     </CardContent>
                   </Card>
                 )}

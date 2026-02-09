@@ -174,7 +174,7 @@ export const cleanupPresence = functions.pubsub
 // ─── On User Created ────────────────────────────────────────
 // Set default custom claims for new users
 export const onUserCreated = functions.auth.user().onCreate(async (user) => {
-  await auth.setCustomUserClaims(user.uid, { role: 'student' });
+  await auth.setCustomUserClaims(user.uid, { role: 'user' });
 
   // Log activity
   await db.collection('activity_events').add({
