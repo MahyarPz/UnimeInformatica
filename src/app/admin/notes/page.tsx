@@ -5,7 +5,7 @@ import {
   collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, where, getDocs,
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getStorage } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase/config';
 import { Note, Course, Topic } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -67,9 +67,18 @@ export default function AdminNotesPage() {
     try {
       if (note.fileUrl) {
         try {
-          const fileRef = ref(storage, note.fileUrl);
-          await deleteObject(fileRef);
-        } catch {}
+          // Extract storage path from download URL
+          // URL format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/ENCODED_PATH?token=...
+          const url = new URL(note.fileUrl);
+          const pathMatch = url.pathname.match(/\/o\/(.+)/);
+          if (pathMatch) {
+            const storagePath = decodeURIComponent(pathMatch[1]);
+            const fileRef = ref(storage, storagePath);
+            await deleteObject(fileRef);
+          }
+        } catch (e) {
+          console.error('Failed to delete file from Storage:', e);
+        }
       }
       await deleteDoc(doc(db, 'notes', note.id));
       addToast({ title: 'Note deleted', variant: 'success' });
