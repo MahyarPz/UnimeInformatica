@@ -65,16 +65,22 @@ export default function AdminNotesPage() {
   const deleteNote = async (note: Note) => {
     if (!confirm('Delete this note?')) return;
     try {
-      if (note.fileUrl) {
+      // Delete file from Storage
+      if (note.fileUrl || (note as any).storagePath) {
         try {
-          // Extract storage path from download URL
-          // URL format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/ENCODED_PATH?token=...
-          const url = new URL(note.fileUrl);
-          const pathMatch = url.pathname.match(/\/o\/(.+)/);
-          if (pathMatch) {
-            const storagePath = decodeURIComponent(pathMatch[1]);
+          let storagePath = (note as any).storagePath;
+          // Fallback: parse URL for old notes without storagePath
+          if (!storagePath && note.fileUrl) {
+            const url = new URL(note.fileUrl);
+            const pathMatch = url.pathname.match(/\/o\/(.+)/);
+            if (pathMatch) {
+              storagePath = decodeURIComponent(pathMatch[1]);
+            }
+          }
+          if (storagePath) {
             const fileRef = ref(storage, storagePath);
             await deleteObject(fileRef);
+            console.log('Storage file deleted:', storagePath);
           }
         } catch (e) {
           console.error('Failed to delete file from Storage:', e);
@@ -198,7 +204,8 @@ function NoteUploadDialog({
     setUploading(true);
 
     try {
-      const fileRef = ref(storage, `notes/${courseId}/${Date.now()}_${file.name}`);
+      const storagePath = `notes/${courseId}/${Date.now()}_${file.name}`;
+      const fileRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(fileRef, file);
 
       uploadTask.on('state_changed', (snapshot) => {
@@ -215,6 +222,7 @@ function NoteUploadDialog({
         description,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         fileUrl,
+        storagePath,
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
