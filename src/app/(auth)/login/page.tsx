@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const router = useRouter();
   const { addToast } = useToast();
 
@@ -28,6 +28,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
       addToast({ title: 'Welcome back!', variant: 'success' });
+      // The EmailVerificationGuard will redirect unverified users to /verify-email
       router.push('/courses');
     } catch (error: any) {
       addToast({

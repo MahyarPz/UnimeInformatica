@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  sendEmailVerification,
+  reload,
   User,
 } from 'firebase/auth';
 import {
@@ -29,6 +31,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   checkUsernameAvailable: (username: string) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 interface SignupData {
@@ -235,6 +239,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     signingUpRef.current = false;
+    // Send verification email (best-effort, don't block signup)
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      await sendEmailVerification(cred.user, {
+        url: `${appUrl}/verify-email`,
+        handleCodeInApp: false,
+      });
+    } catch (verifyError) {
+      console.error('Failed to send verification email:', verifyError);
+    }
     // Fetch profile
     await fetchProfile(cred.user.uid);
   };
@@ -249,6 +263,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setClaims(null);
   };
 
+  const sendVerificationEmailFn = async () => {
+    if (!auth.currentUser) throw new Error('Not logged in');
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    await sendEmailVerification(auth.currentUser, {
+      url: `${appUrl}/verify-email`,
+      handleCodeInApp: false,
+    });
+  };
+
+  const refreshUserFn = async () => {
+    if (!auth.currentUser) throw new Error('Not logged in');
+    await reload(auth.currentUser);
+    // Force React to see the updated user object
+    setUser({ ...auth.currentUser } as User);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -261,6 +291,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         checkUsernameAvailable,
         refreshProfile,
+        sendVerificationEmail: sendVerificationEmailFn,
+        refreshUser: refreshUserFn,
       }}
     >
       {children}

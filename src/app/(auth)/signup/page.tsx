@@ -61,8 +61,8 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await signup({ email, password, username, firstName, lastName, phone });
-      addToast({ title: 'Account created!', description: 'Welcome to Unime Informatica', variant: 'success' });
-      router.push('/courses');
+      addToast({ title: 'Account created!', description: 'Please check your inbox (and spam) to verify your email.', variant: 'success' });
+      router.push('/verify-email');
     } catch (error: any) {
       addToast({
         title: 'Signup failed',

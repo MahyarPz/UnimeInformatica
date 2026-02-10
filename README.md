@@ -71,6 +71,7 @@ A **course-first learning platform** designed for Data Analysis and Computer Sci
 
 ### 👤 User System
 - Email/password authentication
+- **Email verification** required — verification email sent on signup with resend + refresh page
 - **Unique username** with atomic reservation (Firestore transactions)
 - Real-time username availability check with suggestions
 - Public profiles (`/u/username`) with privacy controls
@@ -166,7 +167,8 @@ Full CMS accessible at `/admin`:
 │   │   ├── globals.css          # Tailwind + custom styles
 │   │   ├── (auth)/
 │   │   │   ├── login/page.tsx
-│   │   │   └── signup/page.tsx
+│   │   │   ├── signup/page.tsx
+│   │   │   └── verify-email/page.tsx
 │   │   ├── courses/
 │   │   │   ├── page.tsx         # Course catalog
 │   │   │   └── [slug]/page.tsx  # Course detail (5 tabs)
@@ -251,6 +253,19 @@ npm install
 4. Create a **Realtime Database**
 5. Enable **Cloud Storage**
 6. Download service account key for admin operations
+
+#### Email Verification Setup
+
+Email verification is **required** for new users. After signup, a verification email is sent automatically, and unverified users are blocked from accessing protected routes (courses, practice, labs, admin).
+
+**Firebase Console checklist:**
+
+1. **Authentication → Sign-in method** → Ensure **Email/Password** is enabled
+2. **Authentication → Settings → Authorized domains** → Add your production domain (e.g. `unime-53970450a266.herokuapp.com`) so verification links work correctly
+3. **Authentication → Templates → Email address verification** → (Optional) Customize the sender name, subject, and email body
+4. **Environment variable**: Set `NEXT_PUBLIC_APP_URL` to your production URL (e.g. `https://unime-53970450a266.herokuapp.com`) — this is used as the `continueUrl` in verification emails
+
+> **Note**: Firebase's default email sender is `noreply@your-project.firebaseapp.com`. Users should check their spam/junk folder if they don't see the email.
 
 ```bash
 firebase login
