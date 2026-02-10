@@ -43,6 +43,9 @@ export function useOnlineUsers() {
       setOnlineUsers(online);
       setRecentUsers(recent);
       setLoading(false);
+    }, (error) => {
+      console.error('Presence read failed:', error);
+      setLoading(false);
     });
 
     return () => unsubscribe();

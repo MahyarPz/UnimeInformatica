@@ -1,8 +1,8 @@
 {
   "rules": {
     "presence": {
+      ".read": "auth != null",
       "$uid": {
-        ".read": true,
         ".write": "$uid === auth.uid",
         ".validate": "newData.hasChildren(['username', 'state', 'lastActive'])",
         "username": { ".validate": "newData.isString() && newData.val().length <= 30" },
