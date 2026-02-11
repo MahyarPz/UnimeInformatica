@@ -88,6 +88,7 @@ export default function AdminSettingsPage() {
     deepClone(DEFAULT_SITE_SETTINGS),
   );
   const [savedSnapshot, setSavedSnapshot] = useState<string>('');
+  const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<string | null>(null);
 
@@ -99,9 +100,6 @@ export default function AdminSettingsPage() {
     setSavedSnapshot(JSON.stringify(clone));
     setForm(clone);
   }, [settings, savedSnapshot]);
-
-  // Dirty = computed every render, no effect needed
-  const dirty = savedSnapshot !== '' && JSON.stringify(form) !== savedSnapshot;
 
   // ─── Field updaters ───
   const updateField = useCallback(
@@ -117,6 +115,7 @@ export default function AdminSettingsPage() {
           [key]: value,
         },
       }));
+      setDirty(true);
     },
     [],
   );
@@ -174,6 +173,7 @@ export default function AdminSettingsPage() {
       addToast({ title: 'Settings saved', description: 'Site settings have been updated.', variant: 'success' });
       // Update saved snapshot so dirty resets
       setSavedSnapshot(JSON.stringify(form));
+      setDirty(false);
     } catch (e: any) {
       addToast({ title: 'Save failed', description: e.message || 'Unknown error', variant: 'destructive' });
     }
@@ -184,6 +184,7 @@ export default function AdminSettingsPage() {
     if (savedSnapshot) {
       setForm(JSON.parse(savedSnapshot));
       setErrors({});
+      setDirty(false);
     }
   }, [savedSnapshot]);
 
