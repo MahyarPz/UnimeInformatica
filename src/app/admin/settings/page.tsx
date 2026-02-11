@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
@@ -87,29 +87,21 @@ export default function AdminSettingsPage() {
   const [form, setForm] = useState<Omit<SiteSettings, 'updatedAt' | 'updatedBy'>>(
     deepClone(DEFAULT_SITE_SETTINGS),
   );
-  const [dirty, setDirty] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<string | null>(null);
 
-  // Track the "loaded" snapshot so we can detect dirty state & diff
-  const loadedRef = useRef<Omit<SiteSettings, 'updatedAt' | 'updatedBy'> | null>(null);
-  const initializedRef = useRef(false);
-
   // Sync Firestore → local form ONCE on first load
   useEffect(() => {
-    if (!settings || initializedRef.current) return;
-    initializedRef.current = true;
+    if (!settings || savedSnapshot) return;
     const { updatedAt, updatedBy, ...rest } = settings;
     const clone = deepClone(rest);
-    loadedRef.current = deepClone(clone);
+    setSavedSnapshot(JSON.stringify(clone));
     setForm(clone);
-  }, [settings]);
+  }, [settings, savedSnapshot]);
 
-  // Dirty detection: compare form vs loaded snapshot
-  useEffect(() => {
-    if (!loadedRef.current) return;
-    setDirty(JSON.stringify(form) !== JSON.stringify(loadedRef.current));
-  }, [form]);
+  // Dirty = computed every render, no effect needed
+  const dirty = savedSnapshot !== '' && JSON.stringify(form) !== savedSnapshot;
 
   // ─── Field updaters ───
   const updateField = useCallback(
@@ -160,7 +152,7 @@ export default function AdminSettingsPage() {
       return;
     }
     try {
-      const oldSnapshot = loadedRef.current ?? deepClone(DEFAULT_SITE_SETTINGS);
+      const oldSnapshot = savedSnapshot ? JSON.parse(savedSnapshot) : deepClone(DEFAULT_SITE_SETTINGS);
       const changedKeys = diffKeys(oldSnapshot as Record<string, any>, form as Record<string, any>);
 
       await updateSettings(form as Partial<SiteSettings>);
@@ -180,22 +172,20 @@ export default function AdminSettingsPage() {
       }
 
       addToast({ title: 'Settings saved', description: 'Site settings have been updated.', variant: 'success' });
-      // Update loaded snapshot so dirty resets
-      loadedRef.current = deepClone(form);
-      setDirty(false);
+      // Update saved snapshot so dirty resets
+      setSavedSnapshot(JSON.stringify(form));
     } catch (e: any) {
       addToast({ title: 'Save failed', description: e.message || 'Unknown error', variant: 'destructive' });
     }
-  }, [form, validate, updateSettings, user, userProfile, addToast]);
+  }, [form, savedSnapshot, validate, updateSettings, user, userProfile, addToast]);
 
   // ─── Reset ───
   const handleReset = useCallback(() => {
-    if (loadedRef.current) {
-      setForm(deepClone(loadedRef.current));
+    if (savedSnapshot) {
+      setForm(JSON.parse(savedSnapshot));
       setErrors({});
-      setDirty(false);
     }
-  }, []);
+  }, [savedSnapshot]);
 
   // ─── Storage uploads ───
   const handleImageUpload = useCallback(
