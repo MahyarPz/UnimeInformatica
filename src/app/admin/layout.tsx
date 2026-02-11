@@ -56,7 +56,7 @@ const adminModules = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, claims, loading } = useAuth();
-  const { appName } = useSiteSettingsContext();
+  const { appName, logoUrl } = useSiteSettingsContext();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -183,7 +183,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
           <div className="flex-1" />
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-            <GraduationCap className="h-4 w-4" /> {appName}
+            {logoUrl ? (
+              <img src={logoUrl} alt={appName} className="h-4 w-4 rounded object-contain" />
+            ) : (
+              <GraduationCap className="h-4 w-4" />
+            )}
+            {appName}
           </Link>
         </header>
 

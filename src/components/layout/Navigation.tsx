@@ -38,7 +38,7 @@ const navLinks = [
 
 export function Navigation() {
   const { user, userProfile, claims, logout } = useAuth();
-  const { appName } = useSiteSettingsContext();
+  const { appName, logoUrl } = useSiteSettingsContext();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAdmin = claims?.role === 'admin' || userProfile?.role === 'admin';
@@ -52,7 +52,11 @@ export function Navigation() {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-          <GraduationCap className="h-7 w-7 text-primary" />
+          {logoUrl ? (
+            <img src={logoUrl} alt={appName} className="h-7 w-7 rounded object-contain" />
+          ) : (
+            <GraduationCap className="h-7 w-7 text-primary" />
+          )}
           <span className="hidden sm:inline">{appName}</span>
           <span className="sm:hidden">{appName.split(' ')[0]}</span>
         </Link>
