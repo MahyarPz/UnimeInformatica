@@ -49,7 +49,7 @@ function diffKeys(
   prefix = '',
 ): string[] {
   const changed: string[] = [];
-  const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+  const allKeys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)]));
   for (const key of allKeys) {
     const path = prefix ? `${prefix}.${key}` : key;
     const a = oldObj[key];
