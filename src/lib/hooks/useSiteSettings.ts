@@ -7,6 +7,7 @@ import {
   setDoc,
   serverTimestamp,
   getDoc,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { SiteSettings, DEFAULT_SITE_SETTINGS } from '@/lib/types';
@@ -111,7 +112,22 @@ export function useSiteSettings() {
         merged.updatedAt = serverTimestamp();
         merged.updatedBy = user.uid;
 
-        await setDoc(docRef, merged, { merge: true });
+        // Firestore rejects undefined — convert to deleteField() or remove
+        const sanitize = (obj: Record<string, any>): Record<string, any> => {
+          const out: Record<string, any> = {};
+          for (const [k, v] of Object.entries(obj)) {
+            if (v === undefined) {
+              out[k] = deleteField();
+            } else if (v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date)) {
+              out[k] = sanitize(v);
+            } else {
+              out[k] = v;
+            }
+          }
+          return out;
+        };
+
+        await setDoc(docRef, sanitize(merged), { merge: true });
       } catch (e: any) {
         console.error('Failed to update site settings:', e);
         setError(e.message);

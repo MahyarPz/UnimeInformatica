@@ -563,7 +563,7 @@ export interface SiteSettingsContent {
 
 export interface SiteSettingsLimits {
   maxUploadMB: number;
-  maxNotesPerUser?: number;
+  maxNotesPerUser?: number | null;
 }
 
 export interface SiteSettingsEmailTemplates {
@@ -622,7 +622,7 @@ export const DEFAULT_SITE_SETTINGS: Omit<SiteSettings, 'updatedAt' | 'updatedBy'
   },
   limits: {
     maxUploadMB: 25,
-    maxNotesPerUser: undefined,
+    maxNotesPerUser: null,
   },
   emailTemplates: {
     senderName: 'Unime Informatica',
