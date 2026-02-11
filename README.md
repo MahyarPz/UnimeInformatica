@@ -37,12 +37,14 @@ A **course-first learning platform** designed for Data Analysis and Computer Sci
 ## Features
 
 ### 🎓 Course Catalog
+
 - **4 initial courses**: Calculus 1, Calculus 2, Discrete Mathematics, Mathematics for Data Analysis
 - Rich course pages with Overview, Notes, Practice, Labs, and Progress tabs
 - Topic-based organization with ordering
 - "What you'll learn" accordion on the catalog page
 
 ### ⚡ Practice Engine
+
 - **6 practice modes**: Study, Quick Quiz, Timed Exam, Mistakes Only, Spaced Repetition, Custom
 - MCQ questions with instant feedback (green/red highlighting)
 - Essay questions with rubric display
@@ -51,18 +53,21 @@ A **course-first learning platform** designed for Data Analysis and Computer Sci
 - Per-course configurable settings (question count, time limits, difficulty range)
 
 ### 🧪 Data Analysis Labs
+
 - CSV dataset uploads with preview tables
 - Multi-question labs (MCQ, numeric, text answer types)
 - Scoring and review system
 - Resume in-progress labs
 
 ### 📝 Notes System
+
 - Admin/mod file uploads (PDF, DOCX, PPTX, etc.)
 - Students can create personal notes (private)
 - Tag-based organization and search
 - Public/private toggle per note
 
 ### ❓ Question System
+
 - Admin question bank with bulk actions
 - Students can create personal questions
 - **Submit for Review** workflow: student questions → review queue → public pool
@@ -70,6 +75,7 @@ A **course-first learning platform** designed for Data Analysis and Computer Sci
 - Rejection with feedback
 
 ### 👤 User System
+
 - Email/password authentication
 - **Email verification** required — verification email sent on signup with resend + refresh page
 - **Unique username** with atomic reservation (Firestore transactions)
@@ -78,6 +84,7 @@ A **course-first learning platform** designed for Data Analysis and Computer Sci
 - Motivational profile page with streak tracking
 
 ### 📊 User Dashboard
+
 - Practice history with scores
 - Mistake review
 - Notes management (CRUD)
@@ -87,13 +94,16 @@ A **course-first learning platform** designed for Data Analysis and Computer Sci
 - Account & privacy settings
 
 ### 🔐 Role-Based Access
+
 - **Admin**: Full access to everything
 - **Moderator**: Granular permissions (10 toggleable capabilities)
 - **Student**: Standard access
 - Permission templates for quick moderator setup
 
 ### 🛡️ Admin Panel
+
 Full CMS accessible at `/admin`:
+
 - Dashboard with KPIs and live activity feed
 - Online users real-time presence
 - Courses CRUD with rich text fields
@@ -107,15 +117,18 @@ Full CMS accessible at `/admin`:
 - Announcements CRUD
 - Feature Flags toggle system
 - Audit Log viewer
-- Settings, Analytics, Monetization (stubs)
+- Site Settings (branding, SEO, auth, maintenance, limits, email)
+- Analytics, Monetization (stubs)
 
 ### 📡 Real-Time Features
+
 - User presence via Firebase RTDB (online/idle/offline)
 - 30-second heartbeat ping
 - Live activity feed with category filtering
 - Real-time announcement banners
 
 ### 🏗️ PWA Ready
+
 - Service worker via next-pwa
 - Web app manifest with icons
 - Installable on mobile and desktop
@@ -125,7 +138,7 @@ Full CMS accessible at `/admin`:
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+| ----- | --------- |
 | Framework | **Next.js 14.2.15** (App Router, TypeScript) |
 | Styling | **Tailwind CSS 3.4.14** with CSS variables |
 | Components | Custom shadcn/ui-style (Radix UI + CVA) |
@@ -145,7 +158,7 @@ Full CMS accessible at `/admin`:
 
 ## Project Structure
 
-```
+```text
 ├── firebase/
 │   ├── firestore.rules          # Firestore security rules
 │   ├── firestore.indexes.json   # Composite indexes
@@ -282,6 +295,7 @@ cp .env.local.example .env.local
 ```
 
 Required variables:
+
 ```env
 NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
@@ -326,7 +340,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ### Data Model
 
 | Collection | Purpose |
-|-----------|---------|
+| ---------- | ------- |
 | `users` | User profiles (keyed by Firebase Auth UID) |
 | `usernames` | Username reservation (atomic uniqueness) |
 | `courses` | Course catalog |
@@ -347,16 +361,18 @@ Open [http://localhost:3000](http://localhost:3000).
 | `announcements` | Site-wide announcements |
 | `feature_flags` | Feature toggle switches |
 | `practice_settings` | Per-course practice configuration |
+| `site_settings` | Global platform settings (single doc: `global`) |
 
 ### Role System
 
 | Role | Capabilities |
-|------|-------------|
+| ---- | ------------ |
 | **Admin** | Full access to all features. Can manage users, change roles, access all admin modules. |
 | **Moderator** | Configurable via 10 granular permissions. Uses permission templates for quick setup. |
 | **Student** | Standard access: practice, labs, personal notes/questions, submit for review. |
 
 **Moderator Permissions:**
+
 - `canManageCourses` - Create/edit/delete courses
 - `canManageTopics` - Create/edit/delete topics
 - `canManageNotes` - Upload/edit/delete notes
@@ -368,9 +384,41 @@ Open [http://localhost:3000](http://localhost:3000).
 - `canManageUsers` - Manage user accounts
 - `canManageSettings` - Edit site settings
 
+### Site Settings
+
+Global platform configuration is stored in Firestore at `site_settings/global`.
+
+**Location:** Admin Panel → Site Settings (`/admin/settings`)
+
+**What it controls:**
+
+| Section | Settings |
+| ------- | -------- |
+| **Branding** | App name, tagline, logo, favicon, primary colour |
+| **Contact** | Support email, Instagram, Telegram, website URLs |
+| **SEO** | Default page title/description, OG image, Twitter handle, search indexing toggle |
+| **Auth & Access** | Require email verification, allow signup, public course catalog / profiles / question bank |
+| **Maintenance** | Enable/disable maintenance mode, custom message, bypass roles (admin/moderator) |
+| **Limits** | Max upload MB, max notes per user |
+| **Email Templates** | Display-only sender name, reply-to, subject (actual templates managed in Firebase Console) |
+
+**Runtime behaviour:**
+
+- `auth.requireEmailVerification` — When true, unverified users are redirected to `/verify-email` for all protected routes.
+- `maintenance.enabled` — When true, non-bypass users see a maintenance page. Admin and moderator roles pass through.
+
+**Storage paths** for uploaded branding/SEO images:
+
+- `site/branding/logo.png`
+- `site/branding/favicon.png`
+- `site/seo/og.png`
+
+> **Note:** Firebase Auth email templates (verification, password reset) are configured in the Firebase Console under Authentication → Templates. The email fields in Site Settings are for documentation/reference only.
+
 ### Security Rules
 
 Firestore, RTDB, and Storage rules are in the `firebase/` directory:
+
 - **Firestore**: Role-based access with helper functions for permission checks
 - **RTDB**: Users can only write to their own presence node
 - **Storage**: Size limits per file type, role checks for admin uploads
@@ -395,6 +443,7 @@ This sets the user with email `Notmahyar3@gmail.com` as admin.
 ### Quick Promote
 
 Admins can promote any user by username via the Users & Roles page:
+
 1. Go to `/admin/users`
 2. Enter username in "Quick Promote" card
 3. Select role (Moderator or Admin)
@@ -405,7 +454,7 @@ Admins can promote any user by username via the Users & Roles page:
 ## Cloud Functions
 
 | Function | Trigger | Purpose |
-|----------|---------|---------|
+| -------- | ------- | ------- |
 | `bootstrapAdmin` | HTTP | One-time admin setup |
 | `onRoleChange` | Firestore update on `users/{uid}` | Sync role to Auth custom claims |
 | `onQuestionCreated` | Firestore create on `questions_public` | Update course stats |
@@ -469,6 +518,7 @@ firebase deploy --only functions
 ## PWA Support
 
 The app is PWA-ready with:
+
 - **Web App Manifest** at `/manifest.json`
 - **Service Worker** via `next-pwa` (auto-generated in production)
 - **Installable** on mobile (Android, iOS) and desktop (Chrome, Edge)
@@ -489,6 +539,7 @@ const label = t('courses.title'); // "Courses"
 ```
 
 Currently English only. To add a new locale:
+
 1. Add translations to `src/lib/i18n/index.ts`
 2. Implement locale detection/switching in the i18n module
 
@@ -510,4 +561,4 @@ This is a private project for Unime Informatica. All rights reserved.
 
 ---
 
-**Built with ❤️ for the students of the University of Messina**
+Built with ❤️ for the students of the University of Messina

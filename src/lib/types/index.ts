@@ -517,3 +517,116 @@ export interface ContentPack {
   courseIds: string[];
   active: boolean;
 }
+
+// ============================================================
+// SITE SETTINGS
+// ============================================================
+export interface SiteSettingsBranding {
+  appName: string;
+  tagline?: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+  primaryColorHex?: string;
+}
+
+export interface SiteSettingsContact {
+  supportEmail?: string;
+  instagram?: string;
+  telegram?: string;
+  website?: string;
+}
+
+export interface SiteSettingsSEO {
+  defaultTitle?: string;
+  defaultDescription?: string;
+  ogImageUrl?: string;
+  twitterHandle?: string;
+  indexable: boolean;
+}
+
+export interface SiteSettingsAuth {
+  requireEmailVerification: boolean;
+  allowSignup: boolean;
+}
+
+export interface SiteSettingsMaintenance {
+  enabled: boolean;
+  message?: string;
+  allowedRolesBypass: Array<'admin' | 'moderator'>;
+}
+
+export interface SiteSettingsContent {
+  publicCourseCatalog: boolean;
+  publicProfiles: boolean;
+  publicQuestionBank: boolean;
+}
+
+export interface SiteSettingsLimits {
+  maxUploadMB: number;
+  maxNotesPerUser?: number;
+}
+
+export interface SiteSettingsEmailTemplates {
+  senderName?: string;
+  replyTo?: string;
+  verifySubject?: string;
+}
+
+export interface SiteSettings {
+  branding: SiteSettingsBranding;
+  contact: SiteSettingsContact;
+  seo: SiteSettingsSEO;
+  auth: SiteSettingsAuth;
+  maintenance: SiteSettingsMaintenance;
+  content: SiteSettingsContent;
+  limits: SiteSettingsLimits;
+  emailTemplates: SiteSettingsEmailTemplates;
+  updatedAt: any;
+  updatedBy: string;
+}
+
+export const DEFAULT_SITE_SETTINGS: Omit<SiteSettings, 'updatedAt' | 'updatedBy'> = {
+  branding: {
+    appName: 'Unime Informatica',
+    tagline: '',
+    logoUrl: '',
+    faviconUrl: '',
+    primaryColorHex: '#3b82f6',
+  },
+  contact: {
+    supportEmail: '',
+    instagram: '',
+    telegram: '',
+    website: '',
+  },
+  seo: {
+    defaultTitle: 'Unime Informatica - Master Data Analysis & Computer Science',
+    defaultDescription: 'Course-first learning platform with adaptive practice, mini labs, and community-driven content.',
+    ogImageUrl: '',
+    twitterHandle: '',
+    indexable: true,
+  },
+  auth: {
+    requireEmailVerification: true,
+    allowSignup: true,
+  },
+  maintenance: {
+    enabled: false,
+    message: 'We are currently performing scheduled maintenance. Please check back soon.',
+    allowedRolesBypass: ['admin', 'moderator'],
+  },
+  content: {
+    publicCourseCatalog: true,
+    publicProfiles: true,
+    publicQuestionBank: true,
+  },
+  limits: {
+    maxUploadMB: 25,
+    maxNotesPerUser: undefined,
+  },
+  emailTemplates: {
+    senderName: 'Unime Informatica',
+    replyTo: '',
+    verifySubject: 'Verify your email address',
+  },
+};

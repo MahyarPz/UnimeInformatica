@@ -7,6 +7,7 @@ import { Navigation } from "@/components/layout/Navigation";
 import { AnnouncementBanner } from "@/components/layout/AnnouncementBanner";
 import { PresenceWrapper } from "@/components/layout/PresenceWrapper";
 import { EmailVerificationGuard } from "@/components/layout/EmailVerificationGuard";
+import { MaintenanceGuard } from "@/components/layout/MaintenanceGuard";
 
 // Force all pages to be dynamically rendered (no SSG) — Firebase needs runtime env vars
 export const dynamic = 'force-dynamic';
@@ -40,19 +41,21 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <ToastProvider>
-            <EmailVerificationGuard>
-              <PresenceWrapper />
-              <div className="min-h-screen flex flex-col">
-                <Navigation />
-                <AnnouncementBanner />
-                <main className="flex-1">{children}</main>
-                <footer className="border-t py-6 text-center text-sm text-muted-foreground">
-                  <div className="container">
-                    <p>© {new Date().getFullYear()} Unime Informatica. All rights reserved.</p>
-                  </div>
-                </footer>
-              </div>
-            </EmailVerificationGuard>
+            <MaintenanceGuard>
+              <EmailVerificationGuard>
+                <PresenceWrapper />
+                <div className="min-h-screen flex flex-col">
+                  <Navigation />
+                  <AnnouncementBanner />
+                  <main className="flex-1">{children}</main>
+                  <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+                    <div className="container">
+                      <p>© {new Date().getFullYear()} Unime Informatica. All rights reserved.</p>
+                    </div>
+                  </footer>
+                </div>
+              </EmailVerificationGuard>
+            </MaintenanceGuard>
           </ToastProvider>
         </AuthProvider>
       </body>
