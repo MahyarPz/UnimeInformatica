@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCourses } from '@/lib/hooks/useCourses';
+import { useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
 import { t } from '@/lib/i18n';
 
 const features = [
@@ -47,6 +48,7 @@ const fadeIn = {
 
 export default function HomePage() {
   const { courses } = useCourses();
+  const { appName } = useSiteSettingsContext();
 
   return (
     <div className="flex flex-col">
@@ -94,7 +96,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl font-bold mb-3">Why Unime Informatica?</h2>
+            <h2 className="text-3xl font-bold mb-3">Why {appName}?</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">Everything you need to excel in your courses.</p>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-6">

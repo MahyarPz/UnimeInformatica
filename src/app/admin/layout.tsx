@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -55,6 +56,7 @@ const adminModules = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, claims, loading } = useAuth();
+  const { appName } = useSiteSettingsContext();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -181,7 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
           <div className="flex-1" />
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-            <GraduationCap className="h-4 w-4" /> Unime Informatica
+            <GraduationCap className="h-4 w-4" /> {appName}
           </Link>
         </header>
 

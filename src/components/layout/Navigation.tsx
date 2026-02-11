@@ -17,6 +17,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -37,6 +38,7 @@ const navLinks = [
 
 export function Navigation() {
   const { user, userProfile, claims, logout } = useAuth();
+  const { appName } = useSiteSettingsContext();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAdmin = claims?.role === 'admin' || userProfile?.role === 'admin';
@@ -51,8 +53,8 @@ export function Navigation() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-xl">
           <GraduationCap className="h-7 w-7 text-primary" />
-          <span className="hidden sm:inline">Unime Informatica</span>
-          <span className="sm:hidden">Unime</span>
+          <span className="hidden sm:inline">{appName}</span>
+          <span className="sm:hidden">{appName.split(' ')[0]}</span>
         </Link>
 
         {/* Desktop Nav */}
