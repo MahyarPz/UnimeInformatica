@@ -94,16 +94,26 @@ export default function AdminSettingsPage() {
   // Track the "loaded" snapshot so we can detect dirty state & diff
   const loadedRef = useRef<Omit<SiteSettings, 'updatedAt' | 'updatedBy'> | null>(null);
 
-  // Sync Firestore → local form when settings change (and form is not dirty)
+  // Sync Firestore → local form when settings change (only if user hasn't edited)
   useEffect(() => {
     if (!settings) return;
     const { updatedAt, updatedBy, ...rest } = settings;
     const clone = deepClone(rest);
+
+    // Capture previous loaded snapshot BEFORE updating ref
+    const prevLoadedStr = loadedRef.current
+      ? JSON.stringify(loadedRef.current)
+      : '';
+
+    // Only overwrite local form if it still matches the last known server state
+    setForm((prev) => {
+      if (!prevLoadedStr || JSON.stringify(prev) === prevLoadedStr) {
+        return clone;
+      }
+      return prev; // keep user edits
+    });
+
     loadedRef.current = deepClone(clone);
-    if (!dirty) {
-      setForm(clone);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
   // Dirty detection: compare form vs loaded snapshot
