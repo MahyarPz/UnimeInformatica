@@ -328,6 +328,36 @@ async function seed() {
     console.log(`  ${flag.enabled ? '✅' : '⬜'} ${flag.name}`);
   }
 
+  // Seed site_settings/global with monetization defaults
+  console.log('\n💰 Seeding site_settings/global monetization defaults...');
+  const globalRef = db.collection('site_settings').doc('global');
+  const globalSnap = await globalRef.get();
+  const monetizationDefaults = {
+    aiEnabled: true,
+    monetizationEnabled: true,
+    paidFeaturesEnabled: true,
+    aiQuotas: { free: 0, supporter: 20, pro: 120 },
+    donationInstructions: '',
+    paymentLinks: [],
+  };
+  if (globalSnap.exists) {
+    // Merge monetization into existing doc if not already present
+    const existing = globalSnap.data() || {};
+    if (!existing.monetization) {
+      await globalRef.set({ monetization: monetizationDefaults, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      console.log('  ✅ Monetization defaults merged into existing site_settings/global');
+    } else {
+      console.log('  ⏭️ Monetization already present — skipping');
+    }
+  } else {
+    await globalRef.set({
+      monetization: monetizationDefaults,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: 'seed',
+    });
+    console.log('  ✅ Created site_settings/global with monetization defaults');
+  }
+
   console.log('\n✨ Seed completed successfully!');
   console.log(`   📚 ${courses.length} courses`);
   console.log(`   📌 ${courses.reduce((a, c) => a + c.topics.length, 0)} topics`);

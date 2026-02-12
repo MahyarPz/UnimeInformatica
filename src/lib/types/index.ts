@@ -515,8 +515,87 @@ export interface AdminBootstrap {
 }
 
 // ============================================================
-// MONETIZATION STUBS
+// MONETIZATION TYPES
 // ============================================================
+export type UserPlanTier = 'free' | 'supporter' | 'pro';
+
+export interface AIQuotas {
+  free: number;
+  supporter: number;
+  pro: number;
+}
+
+export const DEFAULT_AI_QUOTAS: AIQuotas = {
+  free: 0,
+  supporter: 20,
+  pro: 120,
+};
+
+export interface PaymentLink {
+  label: string;
+  url: string;
+}
+
+/** Fields stored at site_settings/global for monetization + AI */
+export interface SiteSettingsMonetization {
+  aiEnabled: boolean;
+  monetizationEnabled: boolean;
+  paidFeaturesEnabled: boolean;
+  aiQuotas: AIQuotas;
+  donationInstructions?: string;
+  paymentLinks?: PaymentLink[];
+}
+
+export const DEFAULT_MONETIZATION_SETTINGS: SiteSettingsMonetization = {
+  aiEnabled: true,
+  monetizationEnabled: true,
+  paidFeaturesEnabled: true,
+  aiQuotas: { ...DEFAULT_AI_QUOTAS },
+  donationInstructions: '',
+  paymentLinks: [],
+};
+
+/** user_plans/{uid} */
+export interface UserPlan {
+  uid: string;
+  plan: UserPlanTier;
+  expiresAt: any | null; // Timestamp | null (null = lifetime)
+  activatedBy: string;
+  activatedByUsername: string;
+  reason?: string;
+  createdAt: any;
+  updatedAt: any;
+}
+
+/** ai_usage_daily/{uid_YYYYMMDD} */
+export interface AIUsageDaily {
+  uid: string;
+  dateKey: string;
+  count: number;
+  limit: number;
+  planAtTime: UserPlanTier;
+  updatedAt: any;
+}
+
+/** donation_requests/{id} */
+export type DonationRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface DonationRequest {
+  id?: string;
+  uid: string;
+  username: string;
+  requestedPlan: 'supporter' | 'pro';
+  status: DonationRequestStatus;
+  note?: string;
+  proofFilePath?: string;
+  adminFeedback?: string;
+  reviewedBy?: string;
+  reviewedByUsername?: string;
+  createdAt: any;
+  updatedAt: any;
+}
+
+// Legacy stubs kept for backward compat
 export interface SupporterTier {
   id: string;
   name: string;
@@ -601,6 +680,7 @@ export interface SiteSettings {
   content: SiteSettingsContent;
   limits: SiteSettingsLimits;
   emailTemplates: SiteSettingsEmailTemplates;
+  monetization: SiteSettingsMonetization;
   updatedAt: any;
   updatedBy: string;
 }
@@ -648,6 +728,14 @@ export const DEFAULT_SITE_SETTINGS: Omit<SiteSettings, 'updatedAt' | 'updatedBy'
     senderName: 'Unime Informatica',
     replyTo: '',
     verifySubject: 'Verify your email address',
+  },
+  monetization: {
+    aiEnabled: true,
+    monetizationEnabled: true,
+    paidFeaturesEnabled: true,
+    aiQuotas: { free: 0, supporter: 20, pro: 120 },
+    donationInstructions: '',
+    paymentLinks: [],
   },
 };
 

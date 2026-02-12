@@ -18,6 +18,8 @@ const translations = {
     'nav.login': 'Log In',
     'nav.signup': 'Sign Up',
     'nav.logout': 'Log Out',
+    'nav.ai': 'AI Assistant',
+    'nav.support': 'Support',
 
     // Home
     'home.hero.title': 'Master Data Analysis & Computer Science',

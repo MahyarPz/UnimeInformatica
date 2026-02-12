@@ -6,7 +6,9 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
+  Bot,
   GraduationCap,
+  Heart,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -36,6 +38,8 @@ import { t } from '@/lib/i18n';
 const NAV_ICON_MAP: Record<string, React.ElementType> = {
   '/courses': BookOpen,
   '/practice': Zap,
+  '/ai': Bot,
+  '/support': Heart,
 };
 
 export function Navigation() {
@@ -135,6 +139,16 @@ export function Navigation() {
                     <LayoutDashboard className="mr-2 h-4 w-4" /> {t('nav.dashboard')}
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/ai">
+                    <Bot className="mr-2 h-4 w-4" /> AI Assistant
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/support">
+                    <Heart className="mr-2 h-4 w-4" /> Support
+                  </Link>
+                </DropdownMenuItem>
                 {(isAdmin || isMod) && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin">
@@ -201,6 +215,12 @@ export function Navigation() {
                   </Link>
                   <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
                     <LayoutDashboard className="h-5 w-5" /> {t('nav.dashboard')}
+                  </Link>
+                  <Link href="/ai" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
+                    <Bot className="h-5 w-5" /> AI Assistant
+                  </Link>
+                  <Link href="/support" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
+                    <Heart className="h-5 w-5" /> Support
                   </Link>
                   {(isAdmin || isMod) && (
                     <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">

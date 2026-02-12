@@ -545,6 +545,82 @@ Currently English only. To add a new locale:
 
 ---
 
+## Monetization & AI
+
+### Overview
+
+The platform implements a 3-tier plan system (Free / Supporter / Pro) with donation-based activation and Gemini AI access control:
+
+- **Free**: No AI access (0 prompts/day)
+- **Supporter**: 20 AI prompts/day
+- **Pro**: 120 AI prompts/day
+
+Daily quotas reset at **00:00 Europe/Rome**.
+
+### 3-Layer AI Gating
+
+All AI requests go through `POST /api/ai/chat` with strict server-side enforcement:
+
+1. **Global AI Kill Switch** — `site_settings/global.monetization.aiEnabled` — Server returns 403 if false.
+2. **Monetization Hide Switch** — `site_settings/global.monetization.monetizationEnabled` — UI hides Support page.
+3. **Daily Quota + Atomic Enforcement** — Firestore transaction increments `ai_usage_daily/{uid}_{dateKey}` and blocks if quota exceeded.
+
+### Setting Up Gemini AI
+
+1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Set the env var (server-side only, never prefix with `NEXT_PUBLIC_`):
+
+```bash
+# Heroku
+heroku config:set GEMINI_API_KEY=your_gemini_api_key
+
+# Local
+echo 'GEMINI_API_KEY=your_gemini_api_key' >> .env.local
+```
+
+### Kill Switches (Admin Panel)
+
+Go to **Admin → Monetization → Settings** to toggle:
+
+| Switch | Effect |
+| ------ | ------ |
+| **AI Enabled** | OFF → server blocks all AI calls (403) |
+| **Monetization Visible** | OFF → `/support` page shows "Not Available" |
+| **Paid Features Enabled** | OFF → server blocks all paid feature gates (403) |
+
+### Approving Donations
+
+1. User donates via the links on `/support`
+2. User submits a **Donation Request** (optional proof screenshot)
+3. Admin goes to **Admin → Monetization → Donation Requests**
+4. Click **Review** → choose **Approve** + set duration (7/30/90 days or lifetime)
+5. The user's plan is activated immediately
+
+### Manual Plan Assignment
+
+Admin → Monetization → Manual Override:
+
+- Enter username (case-insensitive)
+- Select plan + duration + reason
+- Click **Assign Plan**
+
+### Firestore Collections
+
+| Collection | Purpose |
+| ---------- | ------- |
+| `site_settings/global.monetization` | Kill switches, quotas, donation instructions |
+| `user_plans/{uid}` | Active plan per user |
+| `ai_usage_daily/{uid}_{YYYYMMDD}` | Daily AI usage counters |
+| `donation_requests/{id}` | User donation requests |
+
+### Storage Rules
+
+| Path | Access |
+| ---- | ------ |
+| `donation_proofs/{uid}/{requestId}/*` | Owner upload (images/PDF, 5MB max), admin read |
+
+---
+
 ## Contributing
 
 1. Fork the repository

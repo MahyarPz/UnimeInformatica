@@ -108,6 +108,7 @@ export function useSiteSettings() {
         if (partial.content) merged.content = { ...current.content, ...partial.content };
         if (partial.limits) merged.limits = { ...current.limits, ...partial.limits };
         if (partial.emailTemplates) merged.emailTemplates = { ...current.emailTemplates, ...partial.emailTemplates };
+        if (partial.monetization) merged.monetization = { ...current.monetization, ...partial.monetization };
 
         merged.updatedAt = serverTimestamp();
         merged.updatedBy = user.uid;

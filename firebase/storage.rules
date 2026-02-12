@@ -35,6 +35,17 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
+    // Donation proofs (owner upload/read, admin read all)
+    match /donation_proofs/{userId}/{requestId}/{fileName} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == userId || request.auth.token.role == 'admin');
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.size < 5 * 1024 * 1024
+                    && (request.resource.contentType.matches('image/.*')
+                        || request.resource.contentType == 'application/pdf');
+    }
+
     // Default: deny
     match /{allPaths=**} {
       allow read, write: if false;
