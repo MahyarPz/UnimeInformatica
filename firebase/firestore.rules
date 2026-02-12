@@ -212,5 +212,19 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // ─── Admin Backups ────────────────────────────────────
+    match /admin_backups/{backupId} {
+      allow read: if isAdmin()
+        || hasModPermission('adminToolsExport');
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Diagnostics Test ─────────────────────────────────
+    match /diagnostics_test/{docId} {
+      allow read, write: if isAdmin();
+    }
   }
 }
