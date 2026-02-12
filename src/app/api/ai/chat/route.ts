@@ -24,15 +24,17 @@ function checkRateLimit(uid: string): boolean {
   return true;
 }
 
-// Clean up stale entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  const keys = Array.from(rateLimitMap.keys());
-  for (const uid of keys) {
-    const entry = rateLimitMap.get(uid);
-    if (entry && now > entry.resetAt) rateLimitMap.delete(uid);
-  }
-}, 5 * 60_000);
+// Clean up stale entries every 5 minutes (only at runtime, not build time)
+if (typeof setInterval !== 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
+  setInterval(() => {
+    const now = Date.now();
+    const keys = Array.from(rateLimitMap.keys());
+    for (const uid of keys) {
+      const entry = rateLimitMap.get(uid);
+      if (entry && now > entry.resetAt) rateLimitMap.delete(uid);
+    }
+  }, 5 * 60_000);
+}
 
 // ─── Europe/Rome date key ─────────────────────────────────
 function getRomeDateKey(): string {
