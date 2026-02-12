@@ -87,41 +87,43 @@ export default function AdminSettingsPage() {
   const [form, setForm] = useState<Omit<SiteSettings, 'updatedAt' | 'updatedBy'>>(
     deepClone(DEFAULT_SITE_SETTINGS),
   );
-  const [savedSnapshot, setSavedSnapshot] = useState<string>('');
   const [dirty, setDirty] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<string | null>(null);
 
+  // Extract the "clean" settings (without Firestore metadata) for reset/comparison
+  const cleanSettings = React.useMemo(() => {
+    if (!settings) return null;
+    const { updatedAt, updatedBy, ...rest } = settings;
+    return deepClone(rest);
+  }, [settings]);
+
   // Sync Firestore → local form ONCE on first load
   useEffect(() => {
-    if (!settings || savedSnapshot) return;
-    const { updatedAt, updatedBy, ...rest } = settings;
-    const clone = deepClone(rest);
-    setSavedSnapshot(JSON.stringify(clone));
-    setForm(clone);
-  }, [settings, savedSnapshot]);
+    if (initialized || !cleanSettings) return;
+    setForm(deepClone(cleanSettings));
+    setInitialized(true);
+  }, [cleanSettings, initialized]);
 
   // ─── Field updaters ───
-  const updateField = useCallback(
-    <S extends keyof Omit<SiteSettings, 'updatedAt' | 'updatedBy'>>(
-      section: S,
-      key: string,
-      value: any,
-    ) => {
-      setForm((prev) => ({
-        ...prev,
-        [section]: {
-          ...(prev[section] as any),
-          [key]: value,
-        },
-      }));
-      setDirty(true);
-    },
-    [],
-  );
+  const updateField = (
+    section: keyof Omit<SiteSettings, 'updatedAt' | 'updatedBy'>,
+    key: string,
+    value: any,
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      [section]: {
+        ...(prev[section] as any),
+        [key]: value,
+      },
+    }));
+    setDirty(true);
+  };
 
   // ─── Validation ───
-  const validate = useCallback((): boolean => {
+  const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.branding.appName.trim()) {
       errs['branding.appName'] = 'App name is required';
@@ -142,7 +144,7 @@ export default function AdminSettingsPage() {
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [form]);
+  };
 
   // ─── Save ───
   const handleSave = async () => {
@@ -151,8 +153,8 @@ export default function AdminSettingsPage() {
       return;
     }
     try {
-      const oldSnapshot = savedSnapshot ? JSON.parse(savedSnapshot) : deepClone(DEFAULT_SITE_SETTINGS);
-      const changedKeys = diffKeys(oldSnapshot as Record<string, any>, form as Record<string, any>);
+      const oldData = cleanSettings ?? deepClone(DEFAULT_SITE_SETTINGS);
+      const changedKeys = diffKeys(oldData as Record<string, any>, form as Record<string, any>);
 
       await updateSettings(form as Partial<SiteSettings>);
 
@@ -171,8 +173,6 @@ export default function AdminSettingsPage() {
       }
 
       addToast({ title: 'Settings saved', description: 'Site settings have been updated.', variant: 'success' });
-      // Update saved snapshot so dirty resets
-      setSavedSnapshot(JSON.stringify(form));
       setDirty(false);
     } catch (e: any) {
       addToast({ title: 'Save failed', description: e.message || 'Unknown error', variant: 'destructive' });
@@ -181,12 +181,14 @@ export default function AdminSettingsPage() {
 
   // ─── Reset ───
   const handleReset = () => {
-    if (savedSnapshot) {
-      setForm(JSON.parse(savedSnapshot));
-      setErrors({});
-      setDirty(false);
-      addToast({ title: 'Changes reverted', variant: 'success' });
+    if (cleanSettings) {
+      setForm(deepClone(cleanSettings));
+    } else {
+      setForm(deepClone(DEFAULT_SITE_SETTINGS));
     }
+    setErrors({});
+    setDirty(false);
+    addToast({ title: 'Changes reverted', variant: 'success' });
   };
 
   // ─── Storage uploads ───
