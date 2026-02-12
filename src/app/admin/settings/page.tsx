@@ -145,7 +145,7 @@ export default function AdminSettingsPage() {
   }, [form]);
 
   // ─── Save ───
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     if (!validate()) {
       addToast({ title: 'Validation error', description: 'Please fix the highlighted fields.', variant: 'destructive' });
       return;
@@ -177,16 +177,17 @@ export default function AdminSettingsPage() {
     } catch (e: any) {
       addToast({ title: 'Save failed', description: e.message || 'Unknown error', variant: 'destructive' });
     }
-  }, [form, savedSnapshot, validate, updateSettings, user, userProfile, addToast]);
+  };
 
   // ─── Reset ───
-  const handleReset = useCallback(() => {
+  const handleReset = () => {
     if (savedSnapshot) {
       setForm(JSON.parse(savedSnapshot));
       setErrors({});
       setDirty(false);
+      addToast({ title: 'Changes reverted', variant: 'success' });
     }
-  }, [savedSnapshot]);
+  };
 
   // ─── Storage uploads ───
   const handleImageUpload = useCallback(
@@ -254,7 +255,7 @@ export default function AdminSettingsPage() {
       </div>
 
       {/* Last updated badge */}
-      {settings?.updatedAt && (
+      {settings?.updatedAt && settings.updatedAt.toDate && (
         <div className="text-xs text-muted-foreground">
           Last updated {formatDateTime(settings.updatedAt)} by{' '}
           <span className="font-medium">{settings.updatedBy ?? 'unknown'}</span>
