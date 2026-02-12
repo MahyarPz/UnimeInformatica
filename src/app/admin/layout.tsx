@@ -32,8 +32,11 @@ import {
   Loader2,
   Shield,
   Globe,
+  Wrench,
+  HeartPulse,
 } from 'lucide-react';
 import { t } from '@/lib/i18n';
+import CommandPalette from '@/components/admin/CommandPalette';
 
 const adminModules = [
   { href: '/admin', label: t('admin.dashboard'), icon: LayoutDashboard, exact: true },
@@ -52,6 +55,8 @@ const adminModules = [
   { type: 'separator' },
   { href: '/admin/settings', label: t('admin.settings'), icon: Settings },
   { href: '/admin/site-content', label: 'Site Content', icon: Globe },
+  { href: '/admin/tools', label: t('admin.tools'), icon: Wrench },
+  { href: '/admin/diagnostics', label: t('admin.diagnostics'), icon: HeartPulse },
   { href: '/admin/analytics', label: t('admin.analytics'), icon: BarChart3 },
   { href: '/admin/monetization', label: t('admin.monetization'), icon: CreditCard },
 ] as const;
@@ -184,6 +189,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex-1" />
+          <CommandPalette />
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
             {logoUrl ? (
               <img src={logoUrl} alt={appName} className="h-4 w-4 rounded object-contain" />

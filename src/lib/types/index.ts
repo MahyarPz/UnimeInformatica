@@ -22,6 +22,11 @@ export interface ModeratorPermissions {
   siteContentEditNav: boolean;
   siteContentEditFooter: boolean;
   siteContentViewHistory: boolean;
+  // Command Palette & Tools permissions
+  adminCommandPalette: boolean;
+  adminToolsExport: boolean;
+  adminToolsImport: boolean;
+  diagnosticsView: boolean;
 }
 
 export interface PermissionTemplate {
@@ -52,6 +57,11 @@ export const DEFAULT_MODERATOR_PERMISSIONS: ModeratorPermissions = {
   siteContentEditNav: false,
   siteContentEditFooter: false,
   siteContentViewHistory: true,
+  // Command Palette & Tools
+  adminCommandPalette: false,
+  adminToolsExport: false,
+  adminToolsImport: false,
+  diagnosticsView: false,
 };
 
 // ============================================================
@@ -939,3 +949,62 @@ export const DEFAULT_FOOTER_CONTENT: Omit<SiteContentFooter, 'draft' | 'publishe
   socials: {},
   copyright: { en: '© {year} Unime Informatica. All rights reserved.' },
 };
+
+// ============================================================
+// ADMIN BACKUP TYPES
+// ============================================================
+export interface AdminBackup {
+  id: string;
+  createdAt: any;
+  createdBy: string;
+  createdByUsername: string;
+  label: string;
+  includes: string[];
+  counts: Record<string, number>;
+  snapshotData?: string; // JSON string (optionally compressed)
+}
+
+// ============================================================
+// EXPORT METADATA
+// ============================================================
+export interface ExportMetadata {
+  exportedAt: string;
+  exportedBy: string;
+  exportedByUsername: string;
+  projectId: string;
+  appVersion?: string;
+  filters?: Record<string, any>;
+}
+
+export interface ExportPayload {
+  metadata: ExportMetadata;
+  data: Record<string, any[]>;
+}
+
+// ============================================================
+// IMPORT TYPES
+// ============================================================
+export type ImportMode = 'create_only' | 'upsert';
+
+export interface ImportPreview {
+  entityType: string;
+  total: number;
+  toCreate: number;
+  toUpdate: number;
+  toSkip: number;
+}
+
+// ============================================================
+// DIAGNOSTICS TYPES
+// ============================================================
+export type DiagnosticStatus = 'ok' | 'warning' | 'error' | 'checking' | 'unknown';
+
+export interface DiagnosticCheck {
+  id: string;
+  name: string;
+  description: string;
+  status: DiagnosticStatus;
+  message?: string;
+  howToFix?: string;
+  lastCheckedAt?: Date;
+}
