@@ -17,6 +17,11 @@ export interface ModeratorPermissions {
   canViewAnalytics: boolean;
   canViewAuditLog: boolean;
   canViewActivityFeed: boolean;
+  // CMS permissions
+  siteContentEditHome: boolean;
+  siteContentEditNav: boolean;
+  siteContentEditFooter: boolean;
+  siteContentViewHistory: boolean;
 }
 
 export interface PermissionTemplate {
@@ -42,6 +47,11 @@ export const DEFAULT_MODERATOR_PERMISSIONS: ModeratorPermissions = {
   canViewAnalytics: false,
   canViewAuditLog: false,
   canViewActivityFeed: true,
+  // CMS
+  siteContentEditHome: false,
+  siteContentEditNav: false,
+  siteContentEditFooter: false,
+  siteContentViewHistory: true,
 };
 
 // ============================================================
@@ -629,4 +639,303 @@ export const DEFAULT_SITE_SETTINGS: Omit<SiteSettings, 'updatedAt' | 'updatedBy'
     replyTo: '',
     verifySubject: 'Verify your email address',
   },
+};
+
+// ============================================================
+// SITE CONTENT (Mini-CMS)
+// ============================================================
+
+/** All CMS-editable pages */
+export type SitePageId = 'home' | 'nav' | 'footer';
+
+/** i18n-ready localized wrapper */
+export type Localized<T> = {
+  en: T;
+  [locale: string]: T;
+};
+
+/** Supported homepage block types */
+export type HomeBlockType =
+  | 'hero'
+  | 'announcement'
+  | 'features'
+  | 'featured_courses'
+  | 'how_it_works'
+  | 'faq'
+  | 'cta'
+  | 'stats'
+  | 'testimonials';
+
+// ─── Block content shapes ─────────────────────────────────
+export interface HeroBlockContent {
+  title: string;
+  subtitle: string;
+  primaryCtaLabel: string;
+  primaryCtaHref: string;
+  secondaryCtaLabel?: string;
+  secondaryCtaHref?: string;
+}
+
+export interface AnnouncementBlockContent {
+  text: string;
+  href?: string;
+  style: 'info' | 'warning' | 'success';
+  dismissible: boolean;
+}
+
+export interface FeaturesBlockContent {
+  heading: string;
+  items: Array<{ title: string; description: string; icon?: string }>;
+}
+
+export interface FeaturedCoursesBlockContent {
+  heading: string;
+  courseSlugs: string[];
+}
+
+export interface HowItWorksBlockContent {
+  heading: string;
+  steps: Array<{ title: string; description: string }>;
+}
+
+export interface FAQBlockContent {
+  heading: string;
+  items: Array<{ q: string; aMarkdown: string }>;
+}
+
+export interface CTABlockContent {
+  heading: string;
+  bodyMarkdown: string;
+  buttonLabel: string;
+  buttonHref: string;
+}
+
+export interface StatsBlockContent {
+  heading: string;
+  items: Array<{ label: string; value: string }>;
+}
+
+export interface TestimonialsBlockContent {
+  heading: string;
+  items: Array<{ name: string; text: string; avatarUrl?: string }>;
+}
+
+export type BlockContentMap = {
+  hero: HeroBlockContent;
+  announcement: AnnouncementBlockContent;
+  features: FeaturesBlockContent;
+  featured_courses: FeaturedCoursesBlockContent;
+  how_it_works: HowItWorksBlockContent;
+  faq: FAQBlockContent;
+  cta: CTABlockContent;
+  stats: StatsBlockContent;
+  testimonials: TestimonialsBlockContent;
+};
+
+// ─── Draft / Published metadata ───────────────────────────
+export interface DraftMeta {
+  updatedAt: any;
+  updatedBy: string;
+  version: number;
+}
+
+export interface PublishedMeta {
+  publishedAt: any;
+  publishedBy: string;
+  version: number;
+}
+
+// ─── Homepage content document ────────────────────────────
+export interface HomeBlock {
+  id: string;
+  type: HomeBlockType;
+  enabled: boolean;
+  order: number;
+  content: Localized<any>;
+}
+
+export interface SiteContentHome {
+  localeDefault: string;
+  localesEnabled: string[];
+  blocks: HomeBlock[];
+  draft: DraftMeta;
+  published?: PublishedMeta;
+}
+
+// ─── Nav content document ─────────────────────────────────
+export interface NavLink {
+  label: Localized<string>;
+  href: string;
+  enabled: boolean;
+  order: number;
+}
+
+export interface SiteContentNav {
+  links: NavLink[];
+  showLogin: boolean;
+  showSignup: boolean;
+  draft: DraftMeta;
+  published?: PublishedMeta;
+}
+
+// ─── Footer content document ──────────────────────────────
+export interface FooterLink {
+  label: Localized<string>;
+  href: string;
+  enabled: boolean;
+  order: number;
+}
+
+export interface FooterColumn {
+  title: Localized<string>;
+  links: FooterLink[];
+}
+
+export interface SiteContentFooter {
+  columns: FooterColumn[];
+  socials: { instagram?: string; telegram?: string; github?: string; website?: string };
+  copyright: Localized<string>;
+  draft: DraftMeta;
+  published?: PublishedMeta;
+}
+
+// ─── Version history ──────────────────────────────────────
+export interface SiteContentVersion {
+  pageId: SitePageId;
+  kind: 'draft' | 'published';
+  version: number;
+  snapshot: any;
+  createdAt: any;
+  createdBy: string;
+  label?: string;
+}
+
+// ─── Extended moderator permissions for CMS ───────────────
+export interface CMSPermissions {
+  siteContentEditHome: boolean;
+  siteContentEditNav: boolean;
+  siteContentEditFooter: boolean;
+  siteContentViewHistory: boolean;
+}
+
+// ─── Default seed data ────────────────────────────────────
+export const DEFAULT_HOME_CONTENT: Omit<SiteContentHome, 'draft' | 'published'> = {
+  localeDefault: 'en',
+  localesEnabled: ['en'],
+  blocks: [
+    {
+      id: 'hero-1',
+      type: 'hero',
+      enabled: true,
+      order: 0,
+      content: {
+        en: {
+          title: 'Master Data Analysis & Computer Science',
+          subtitle: 'Practice-driven courses with adaptive learning, mini labs, and instant feedback.',
+          primaryCtaLabel: 'Explore Courses',
+          primaryCtaHref: '/courses',
+          secondaryCtaLabel: 'Practice Hub',
+          secondaryCtaHref: '/practice',
+        },
+      },
+    },
+    {
+      id: 'features-1',
+      type: 'features',
+      enabled: true,
+      order: 1,
+      content: {
+        en: {
+          heading: 'Why Unime Informatica?',
+          items: [
+            { title: 'Smart Practice', description: 'Adaptive difficulty, weakness targeting, and detailed analytics.', icon: 'Zap' },
+            { title: 'Data Labs', description: 'Hands-on mini labs with real datasets and guided analysis.', icon: 'FlaskConical' },
+            { title: 'Community', description: 'Submit questions, earn attribution, and build your profile.', icon: 'Users' },
+          ],
+        },
+      },
+    },
+    {
+      id: 'featured_courses-1',
+      type: 'featured_courses',
+      enabled: true,
+      order: 2,
+      content: { en: { heading: 'Available Courses', courseSlugs: [] } },
+    },
+    {
+      id: 'stats-1',
+      type: 'stats',
+      enabled: true,
+      order: 3,
+      content: {
+        en: {
+          heading: '',
+          items: [
+            { label: 'Courses', value: '4+' },
+            { label: 'Practice Modes', value: '6' },
+            { label: 'Data Labs', value: 'Interactive' },
+            { label: 'Analytics', value: 'Detailed' },
+          ],
+        },
+      },
+    },
+    {
+      id: 'faq-1',
+      type: 'faq',
+      enabled: false,
+      order: 4,
+      content: {
+        en: {
+          heading: 'Frequently Asked Questions',
+          items: [
+            { q: 'Is the platform free?', aMarkdown: 'Yes, the core features are completely free.' },
+          ],
+        },
+      },
+    },
+    {
+      id: 'cta-1',
+      type: 'cta',
+      enabled: false,
+      order: 5,
+      content: {
+        en: {
+          heading: 'Ready to Start Learning?',
+          bodyMarkdown: 'Join thousands of students mastering data analysis and computer science.',
+          buttonLabel: 'Get Started',
+          buttonHref: '/signup',
+        },
+      },
+    },
+  ],
+};
+
+export const DEFAULT_NAV_CONTENT: Omit<SiteContentNav, 'draft' | 'published'> = {
+  links: [
+    { label: { en: 'Courses' }, href: '/courses', enabled: true, order: 0 },
+    { label: { en: 'Practice Hub' }, href: '/practice', enabled: true, order: 1 },
+  ],
+  showLogin: true,
+  showSignup: true,
+};
+
+export const DEFAULT_FOOTER_CONTENT: Omit<SiteContentFooter, 'draft' | 'published'> = {
+  columns: [
+    {
+      title: { en: 'Platform' },
+      links: [
+        { label: { en: 'Courses' }, href: '/courses', enabled: true, order: 0 },
+        { label: { en: 'Practice Hub' }, href: '/practice', enabled: true, order: 1 },
+      ],
+    },
+    {
+      title: { en: 'Account' },
+      links: [
+        { label: { en: 'Dashboard' }, href: '/dashboard', enabled: true, order: 0 },
+        { label: { en: 'Profile' }, href: '/profile', enabled: true, order: 1 },
+      ],
+    },
+  ],
+  socials: {},
+  copyright: { en: '© {year} Unime Informatica. All rights reserved.' },
 };

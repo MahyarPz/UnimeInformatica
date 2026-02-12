@@ -191,6 +191,26 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ─── Site Content (CMS) ───────────────────────────────
+    match /site_content/{doc} {
+      allow read: if true;
+      allow write: if isAdmin()
+        || (doc == 'home' && hasModPermission('siteContentEditHome'))
+        || (doc == 'nav' && hasModPermission('siteContentEditNav'))
+        || (doc == 'footer' && hasModPermission('siteContentEditFooter'));
+    }
+
+    // ─── Site Content Versions (history) ──────────────────
+    match /site_content_versions/{versionId} {
+      allow read: if isAdmin()
+        || hasModPermission('siteContentViewHistory');
+      allow create: if isAdmin()
+        || hasModPermission('siteContentEditHome')
+        || hasModPermission('siteContentEditNav')
+        || hasModPermission('siteContentEditFooter');
+      allow delete: if isAdmin();
+    }
+
     // ─── Supporter Tiers ──────────────────────────────────
     match /supporter_tiers/{tierId} {
       allow read: if true;

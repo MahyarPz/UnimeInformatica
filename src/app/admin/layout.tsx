@@ -31,6 +31,7 @@ import {
   ChevronLeft,
   Loader2,
   Shield,
+  Globe,
 } from 'lucide-react';
 import { t } from '@/lib/i18n';
 
@@ -50,6 +51,7 @@ const adminModules = [
   { href: '/admin/audit-log', label: t('admin.auditLog'), icon: ScrollText },
   { type: 'separator' },
   { href: '/admin/settings', label: t('admin.settings'), icon: Settings },
+  { href: '/admin/site-content', label: 'Site Content', icon: Globe },
   { href: '/admin/analytics', label: t('admin.analytics'), icon: BarChart3 },
   { href: '/admin/monetization', label: t('admin.monetization'), icon: CreditCard },
 ] as const;
