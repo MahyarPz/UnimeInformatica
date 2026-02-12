@@ -31,7 +31,7 @@ export function getAdminDb(): Firestore {
 export const adminAuth = new Proxy({} as Auth, {
   get: (_, prop) => {
     const real = getAdminAuth();
-    const val = (real as Record<string | symbol, unknown>)[prop];
+    const val = (real as unknown as Record<string | symbol, unknown>)[prop];
     return typeof val === 'function' ? (val as Function).bind(real) : val;
   },
 });
@@ -39,7 +39,7 @@ export const adminAuth = new Proxy({} as Auth, {
 export const adminDb = new Proxy({} as Firestore, {
   get: (_, prop) => {
     const real = getAdminDb();
-    const val = (real as Record<string | symbol, unknown>)[prop];
+    const val = (real as unknown as Record<string | symbol, unknown>)[prop];
     return typeof val === 'function' ? (val as Function).bind(real) : val;
   },
 });
