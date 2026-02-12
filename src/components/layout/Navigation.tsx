@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
+import { useSiteContentContext } from '@/contexts/SiteContentContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -31,18 +32,42 @@ import {
 import { cn, getInitials } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
-const navLinks = [
-  { href: '/courses', label: t('nav.courses'), icon: BookOpen },
-  { href: '/practice', label: t('nav.practice'), icon: Zap },
-];
+// Icon map for nav links from CMS
+const NAV_ICON_MAP: Record<string, React.ElementType> = {
+  '/courses': BookOpen,
+  '/practice': Zap,
+};
 
 export function Navigation() {
   const { user, userProfile, claims, logout } = useAuth();
   const { appName, logoUrl } = useSiteSettingsContext();
+  const { nav } = useSiteContentContext();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAdmin = claims?.role === 'admin' || userProfile?.role === 'admin';
   const isMod = claims?.role === 'moderator' || userProfile?.role === 'moderator';
+
+  // Build nav links from CMS, fall back to hardcoded
+  const navLinks = React.useMemo(() => {
+    if (nav && nav.links && nav.links.length > 0) {
+      return nav.links
+        .filter((l) => l.enabled)
+        .sort((a, b) => a.order - b.order)
+        .map((l) => ({
+          href: l.href,
+          label: l.label?.en || '',
+          icon: NAV_ICON_MAP[l.href] || BookOpen,
+        }));
+    }
+    // Fallback
+    return [
+      { href: '/courses', label: t('nav.courses'), icon: BookOpen },
+      { href: '/practice', label: t('nav.practice'), icon: Zap },
+    ];
+  }, [nav]);
+
+  const showLogin = nav?.showLogin ?? true;
+  const showSignup = nav?.showSignup ?? true;
 
   // Don't show nav on admin pages (admin has its own layout)
   if (pathname?.startsWith('/admin')) return null;
@@ -125,12 +150,16 @@ export function Navigation() {
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" asChild size="sm">
-                <Link href="/login">{t('nav.login')}</Link>
-              </Button>
-              <Button asChild size="sm">
-                <Link href="/signup">{t('nav.signup')}</Link>
-              </Button>
+              {showLogin && (
+                <Button variant="ghost" asChild size="sm">
+                  <Link href="/login">{t('nav.login')}</Link>
+                </Button>
+              )}
+              {showSignup && (
+                <Button asChild size="sm">
+                  <Link href="/signup">{t('nav.signup')}</Link>
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -184,12 +213,16 @@ export function Navigation() {
                 </>
               ) : (
                 <div className="flex gap-2 px-3 pt-2">
-                  <Button variant="outline" asChild className="flex-1" onClick={() => setMobileOpen(false)}>
-                    <Link href="/login">{t('nav.login')}</Link>
-                  </Button>
-                  <Button asChild className="flex-1" onClick={() => setMobileOpen(false)}>
-                    <Link href="/signup">{t('nav.signup')}</Link>
-                  </Button>
+                  {showLogin && (
+                    <Button variant="outline" asChild className="flex-1" onClick={() => setMobileOpen(false)}>
+                      <Link href="/login">{t('nav.login')}</Link>
+                    </Button>
+                  )}
+                  {showSignup && (
+                    <Button asChild className="flex-1" onClick={() => setMobileOpen(false)}>
+                      <Link href="/signup">{t('nav.signup')}</Link>
+                    </Button>
+                  )}
                 </div>
               )}
             </nav>
