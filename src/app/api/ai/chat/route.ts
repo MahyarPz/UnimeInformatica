@@ -61,7 +61,17 @@ export async function POST(request: NextRequest) {
     let decodedToken;
     try {
       decodedToken = await adminAuth.verifyIdToken(idToken);
-    } catch {
+    } catch (err: any) {
+      const code = err?.errorInfo?.code || err?.code || '';
+      // Log the real error server-side for debugging
+      console.error('[AI Chat] verifyIdToken error:', code, err?.message);
+
+      if (code === 'app/invalid-credential' || code === 'auth/invalid-credential') {
+        return NextResponse.json(
+          { error: 'Server authentication misconfigured. Contact admin.' },
+          { status: 500 },
+        );
+      }
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
