@@ -19,18 +19,29 @@ function Footer() {
   );
 }
 
+function AppShell({ children }: { children: React.ReactNode }) {
+  const { loading } = useSiteSettingsContext();
+
+  return (
+    <div
+      className="min-h-screen flex flex-col transition-opacity duration-200"
+      style={{ opacity: loading ? 0 : 1 }}
+    >
+      <Navigation />
+      <AnnouncementBanner />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+}
+
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <SiteSettingsProvider>
       <MaintenanceGuard>
         <EmailVerificationGuard>
           <PresenceWrapper />
-          <div className="min-h-screen flex flex-col">
-            <Navigation />
-            <AnnouncementBanner />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <AppShell>{children}</AppShell>
         </EmailVerificationGuard>
       </MaintenanceGuard>
     </SiteSettingsProvider>
