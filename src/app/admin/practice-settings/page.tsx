@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { useAuth } from '@/contexts/AuthContext';
 import { Course, PracticeSettings } from '@/lib/types';
+import { logAudit } from '@/lib/firebase/activity';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
-import { Sliders, Save, BookOpen, RotateCcw, Loader2 } from 'lucide-react';
+import { Sliders, Save, BookOpen, RotateCcw, Loader2, AlertCircle, Check } from 'lucide-react';
 
 const DEFAULT_SETTINGS: PracticeSettings = {
   courseId: '',
@@ -28,12 +30,26 @@ const DEFAULT_SETTINGS: PracticeSettings = {
 };
 
 export default function AdminPracticeSettingsPage() {
+  const { user, userProfile, refreshProfile } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState('');
   const [settings, setSettings] = useState<PracticeSettings>(DEFAULT_SETTINGS);
+  const [savedSettings, setSavedSettings] = useState<PracticeSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const { addToast } = useToast();
+
+  // Force token refresh on mount to pick up latest custom claims
+  useEffect(() => {
+    refreshProfile?.();
+  }, [refreshProfile]);
+
+  // Dirty detection
+  const dirty = useMemo(
+    () => JSON.stringify(settings) !== JSON.stringify(savedSettings),
+    [settings, savedSettings],
+  );
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'courses'), orderBy('order')), (snap) => {
@@ -47,29 +63,70 @@ export default function AdminPracticeSettingsPage() {
   useEffect(() => {
     if (!selectedCourse) return;
     setLoading(true);
+    setSaveStatus('idle');
     const loadSettings = async () => {
-      const snap = await getDoc(doc(db, 'practice_settings', selectedCourse));
-      if (snap.exists()) {
-        setSettings({ ...DEFAULT_SETTINGS, ...snap.data() } as PracticeSettings);
-      } else {
+      try {
+        const snap = await getDoc(doc(db, 'practice_settings', selectedCourse));
+        const loaded = snap.exists()
+          ? { ...DEFAULT_SETTINGS, ...snap.data() } as PracticeSettings
+          : { ...DEFAULT_SETTINGS, courseId: selectedCourse };
+        setSettings(loaded);
+        setSavedSettings(loaded);
+      } catch (err) {
+        console.error('Failed to load practice settings:', err);
         setSettings({ ...DEFAULT_SETTINGS, courseId: selectedCourse });
+        setSavedSettings({ ...DEFAULT_SETTINGS, courseId: selectedCourse });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     loadSettings();
   }, [selectedCourse]);
 
   const saveSettings = async () => {
+    if (!selectedCourse) return;
     setSaving(true);
+    setSaveStatus('idle');
     try {
-      await setDoc(doc(db, 'practice_settings', selectedCourse), {
+      const payload = {
         ...settings,
         courseId: selectedCourse,
         updatedAt: serverTimestamp(),
-      });
+      };
+      await setDoc(doc(db, 'practice_settings', selectedCourse), payload);
+
+      // Update saved snapshot so dirty resets
+      setSavedSettings({ ...settings, courseId: selectedCourse });
+      setSaveStatus('success');
+
+      // Audit log
+      if (user && userProfile) {
+        await logAudit({
+          action: 'practice_settings.update',
+          category: 'admin',
+          actorUid: user.uid,
+          actorUsername: userProfile.username,
+          actorRole: userProfile.role,
+          targetType: 'practice_settings',
+          targetId: selectedCourse,
+          details: { courseId: selectedCourse },
+        }).catch(() => {});
+      }
+
       addToast({ title: 'Settings saved!', variant: 'success' });
-    } catch {
-      addToast({ title: 'Failed to save', variant: 'destructive' });
+
+      // Clear success indicator after 3s
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (err: any) {
+      console.error('Failed to save practice settings:', err);
+      setSaveStatus('error');
+      addToast({
+        title: 'Failed to save',
+        description: err?.code === 'permission-denied'
+          ? 'Permission denied. Please sign out and sign back in.'
+          : err?.message || 'Unknown error',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -77,6 +134,8 @@ export default function AdminPracticeSettingsPage() {
 
   const resetDefaults = () => {
     setSettings({ ...DEFAULT_SETTINGS, courseId: selectedCourse });
+    setSaveStatus('idle');
+    addToast({ title: 'Reset to defaults', description: 'Click Save to persist.', variant: 'default' });
   };
 
   return (
@@ -198,14 +257,25 @@ export default function AdminPracticeSettingsPage() {
         </div>
       )}
 
-      <div className="flex gap-3">
-        <Button onClick={saveSettings} disabled={saving}>
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          Save Settings
+      <div className="flex items-center gap-3">
+        <Button onClick={saveSettings} disabled={saving || !dirty}>
+          {saving ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : saveStatus === 'success' ? (
+            <Check className="h-4 w-4 mr-2 text-green-500" />
+          ) : saveStatus === 'error' ? (
+            <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
+          {saveStatus === 'success' ? 'Saved!' : saveStatus === 'error' ? 'Failed — Retry' : 'Save Settings'}
         </Button>
-        <Button variant="outline" onClick={resetDefaults}>
+        <Button variant="outline" onClick={resetDefaults} disabled={saving}>
           <RotateCcw className="h-4 w-4 mr-2" /> Reset to Defaults
         </Button>
+        {dirty && (
+          <span className="text-xs text-yellow-600 font-medium">Unsaved changes</span>
+        )}
       </div>
     </div>
   );
