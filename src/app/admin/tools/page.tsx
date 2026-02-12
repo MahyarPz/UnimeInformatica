@@ -131,7 +131,7 @@ function ExportTab() {
   const { user, userProfile } = useAuth();
   const { addToast } = useToast();
   const [selectedCollections, setSelectedCollections] = useState<string[]>(['courses', 'topics']);
-  const [filterCourseId, setFilterCourseId] = useState('');
+  const [filterCourseId, setFilterCourseId] = useState('__all__');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [exporting, setExporting] = useState(false);
   const [courses, setCourses] = useState<Array<{ id: string; title: string }>>([]);
@@ -167,7 +167,7 @@ function ExportTab() {
         let constraints: any[] = [];
 
         // Apply course filter for relevant collections
-        if (filterCourseId && ['topics', 'questions_public', 'labs'].includes(col)) {
+        if (filterCourseId && filterCourseId !== '__all__' && ['topics', 'questions_public', 'labs'].includes(col)) {
           constraints.push(where('courseId', '==', filterCourseId));
         }
 
@@ -190,7 +190,7 @@ function ExportTab() {
           exportedByUsername: userProfile?.username || '',
           projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
           filters: {
-            courseId: filterCourseId || undefined,
+            courseId: filterCourseId !== '__all__' ? filterCourseId : undefined,
             status: filterStatus !== 'all' ? filterStatus : undefined,
           },
         },
@@ -217,7 +217,7 @@ function ExportTab() {
           details: {
             collections: selectedCollections,
             counts: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v.length])),
-            filters: { courseId: filterCourseId, status: filterStatus },
+            filters: { courseId: filterCourseId !== '__all__' ? filterCourseId : undefined, status: filterStatus },
           },
         });
       }
@@ -275,7 +275,7 @@ function ExportTab() {
                 <SelectValue placeholder="All courses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All courses</SelectItem>
+                <SelectItem value="__all__">All courses</SelectItem>
                 {courses.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
                 ))}
