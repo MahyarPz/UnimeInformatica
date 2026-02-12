@@ -24,7 +24,7 @@ import { useToast } from '@/components/ui/toast';
 import { logAudit } from '@/lib/firebase/activity';
 import {
   Users, Search, Shield, ShieldCheck, ShieldAlert, UserCheck, Ban,
-  Crown, Edit, Loader2, ChevronDown, ChevronUp, Settings,
+  Crown, Edit, Loader2, ChevronDown, ChevronUp, Settings, Zap,
 } from 'lucide-react';
 
 const PERMISSION_TEMPLATES: PermissionTemplate[] = [
@@ -366,6 +366,8 @@ function UserCard({
                 <span className="font-medium">{targetUser.firstName ? `${targetUser.firstName} ${targetUser.lastName || ''}`.trim() : targetUser.username}</span>
                 <span className="text-sm text-muted-foreground">@{targetUser.username}</span>
                 {targetUser.banned && <Badge variant="destructive">Banned</Badge>}
+                {targetUser.plan === 'pro' && <Badge className="bg-amber-100 text-amber-700 text-xs"><Crown className="h-3 w-3 mr-1" />PRO</Badge>}
+                {targetUser.plan === 'supporter' && <Badge className="bg-blue-100 text-blue-700 text-xs"><Zap className="h-3 w-3 mr-1" />SUPPORTER</Badge>}
               </div>
               <p className="text-xs text-muted-foreground">{targetUser.email}</p>
             </div>

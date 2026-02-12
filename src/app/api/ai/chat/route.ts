@@ -50,6 +50,7 @@ function getRomeDateKey(): string {
 
 // ─── POST handler ─────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  const requestStartMs = Date.now();
   try {
     // ── 1. Verify Firebase ID token ──
     const authHeader = request.headers.get('Authorization');
@@ -126,28 +127,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 3. Determine user plan ──
+    // ── 3. Determine user plan + per-user overrides ──
     const planSnap = await adminDb.doc(`user_plans/${uid}`).get();
     let userTier: 'free' | 'supporter' | 'pro' = 'free';
+    let planStatus: 'active' | 'revoked' | 'expired' = 'active';
+    let aiBanned = false;
+    let bonusTokens = 0;
+    let aiQuotaOverride: number | null = null;
 
     if (planSnap.exists) {
       const planData = planSnap.data()!;
-      const expiresAt = planData.expiresAt;
-
-      if (expiresAt === null || expiresAt === undefined) {
-        // Lifetime plan
-        userTier = planData.plan || 'free';
+      
+      // Check status first
+      if (planData.status === 'revoked' || planData.status === 'expired') {
+        planStatus = planData.status;
+        userTier = 'free';
       } else {
-        const expiryDate = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
-        if (expiryDate > new Date()) {
+        const expiresAt = planData.endsAt ?? planData.expiresAt;
+        if (expiresAt === null || expiresAt === undefined) {
+          // Lifetime plan
           userTier = planData.plan || 'free';
+        } else {
+          const expiryDate = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
+          if (expiryDate > new Date()) {
+            userTier = planData.plan || 'free';
+          }
+          // else: expired → stays free
         }
-        // else: expired → stays free
       }
+
+      // Per-user AI overrides
+      aiBanned = planData.aiBanned === true;
+      bonusTokens = planData.bonusTokens || 0;
+      aiQuotaOverride = planData.aiQuotaOverride != null ? planData.aiQuotaOverride : null;
     }
 
-    // ── 4. Get quota for plan ──
+    // Layer 3: Per-user AI ban
+    if (aiBanned) {
+      return NextResponse.json(
+        { error: 'Your AI access has been suspended. Contact support.', code: 'AI_BANNED', plan: userTier, remaining: 0 },
+        { status: 403 },
+      );
+    }
+
+    // ── 4. Get quota for plan (with per-user overrides) ──
     const aiQuotas = monetization?.aiQuotas || { free: 0, supporter: 20, pro: 120 };
+    let quota = aiQuotaOverride != null ? aiQuotaOverride : (aiQuotas[userTier] ?? 0);
+    quota += bonusTokens;
     const quota = aiQuotas[userTier] ?? 0;
 
     if (quota <= 0) {
@@ -270,7 +296,21 @@ export async function POST(request: NextRequest) {
       geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ||
       'I could not generate a response. Please try again.';
 
-    // ── 8. Log audit (fire-and-forget) ──
+    // ── 8. Log to ai_logs collection (anti-abuse) + audit (fire-and-forget) ──
+    const latencyMs = Date.now() - requestStartMs;
+    adminDb.collection('ai_logs').add({
+      uid,
+      plan: userTier,
+      planAtTime: userTier,
+      promptChars: message.length,
+      responseChars: aiText.length,
+      status: 'success',
+      model: GEMINI_MODEL,
+      latencyMs,
+      dateKey,
+      timestamp: FieldValue.serverTimestamp(),
+    }).catch((err) => console.error('AI log error:', err));
+
     adminDb.collection('audit_log').add({
       action: 'ai.chat',
       category: 'monetization',

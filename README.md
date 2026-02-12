@@ -461,6 +461,10 @@ Admins can promote any user by username via the Users & Roles page:
 | `onSessionCompleted` | Firestore update on `sessions` | Update user stats + daily summary |
 | `cleanupPresence` | Pub/Sub (every 60 min) | Remove stale RTDB presence |
 | `onUserCreated` | Auth user create | Set default claims + log activity |
+| `adminSetUserPlan` | Callable | Admin grants/changes user plan (writes denorm + history + audit) |
+| `adminRevokeUserPlan` | Callable | Admin revokes user plan → free |
+| `adminSetUserAIOverrides` | Callable | Sets per-user AI overrides (bonusTokens, aiBanned, quotaOverride) |
+| `dailyPlanExpiration` | Scheduled (00:05 Europe/Rome) | Auto-expires plans with endsAt < now |
 
 ### Deploy Functions
 
@@ -549,21 +553,51 @@ Currently English only. To add a new locale:
 
 ### Overview
 
-The platform implements a 3-tier plan system (Free / Supporter / Pro) with donation-based activation and Gemini AI access control:
+The platform implements a 3-tier plan system (Free / Supporter / Pro) with donation-based activation, Gemini AI access control, and full server-side plan management:
 
-- **Free**: No AI access (0 prompts/day)
+- **Free**: No AI access (0 prompts/day by default)
 - **Supporter**: 20 AI prompts/day
 - **Pro**: 120 AI prompts/day
 
-Daily quotas reset at **00:00 Europe/Rome**.
+Daily quotas reset at **00:00 Europe/Rome**. Plans can have expiry dates and are auto-expired by a scheduled Cloud Function.
 
-### 3-Layer AI Gating
+### 5-Layer AI Gating
 
 All AI requests go through `POST /api/ai/chat` with strict server-side enforcement:
 
 1. **Global AI Kill Switch** — `site_settings/global.monetization.aiEnabled` — Server returns 403 if false.
-2. **Monetization Hide Switch** — `site_settings/global.monetization.monetizationEnabled` — UI hides Support page.
-3. **Daily Quota + Atomic Enforcement** — Firestore transaction increments `ai_usage_daily/{uid}_{dateKey}` and blocks if quota exceeded.
+2. **Paid Features Switch** — `site_settings/global.monetization.paidFeaturesEnabled` — Server returns 403 if false.
+3. **Plan Status Check** — Reads `user_plans/{uid}` — checks `status` (active/revoked/expired) and `endsAt`.
+4. **Per-User AI Ban** — `user_plans/{uid}.aiBanned` — Returns 403 even for Pro users.
+5. **Daily Quota + Atomic Enforcement** — Firestore transaction increments `ai_usage_daily/{uid}_{dateKey}`. Per-user overrides: `aiQuotaOverride` replaces base quota, `bonusTokens` adds on top.
+
+### Per-User AI Controls
+
+Admins can set per-user AI overrides via the Plan Details drawer (Admin → Monetization → Users & Plans → click user → AI Controls):
+
+| Override | Effect |
+| -------- | ------ |
+| **AI Banned** | Blocks AI access regardless of plan |
+| **Bonus Tokens** | Extra prompts/day added to base quota |
+| **Quota Override** | Replaces base plan quota entirely |
+
+### Plan Management (Server-Side)
+
+All plan changes go through Cloud Functions (client-side writes are blocked by Firestore rules):
+
+- **adminSetUserPlan** — Writes to `user_plans/{uid}`, denormalizes to `users/{uid}`, creates history entry + audit log
+- **adminRevokeUserPlan** — Sets plan=free, status=revoked, syncs denorm + history + audit
+- **dailyPlanExpiration** — Runs at 00:05 Europe/Rome, auto-expires plans with `endsAt < now`
+
+### Admin UI
+
+Go to **Admin → Monetization** for:
+
+- **KPI Cards** — Active Pro, Active Supporter, Total Paid, Revoked/Expired
+- **Users & Plans** — Searchable/filterable table with quick actions (upgrade, revoke, edit), bulk operations, CSV export
+- **Plan Details Drawer** — Full plan info, AI overrides, plan history timeline
+- **Donations** — Review/approve/reject donation requests (approving activates plan via Cloud Function)
+- **Settings** — Kill switches, AI quotas per plan, donation instructions, payment links
 
 ### Setting Up Gemini AI
 
@@ -592,25 +626,27 @@ Go to **Admin → Monetization → Settings** to toggle:
 
 1. User donates via the links on `/support`
 2. User submits a **Donation Request** (optional proof screenshot)
-3. Admin goes to **Admin → Monetization → Donation Requests**
+3. Admin goes to **Admin → Monetization → Donations** tab
 4. Click **Review** → choose **Approve** + set duration (7/30/90 days or lifetime)
-5. The user's plan is activated immediately
+5. The user's plan is activated via Cloud Function (server-side)
 
-### Manual Plan Assignment
+### Quick Plan Assignment
 
-Admin → Monetization → Manual Override:
+Admin → Monetization → Users & Plans tab:
 
-- Enter username (case-insensitive)
-- Select plan + duration + reason
-- Click **Assign Plan**
+- Use **quick action buttons** to upgrade/revoke per row
+- Use **Edit** button for full plan change dialog (plan, duration, reason)
+- Use **checkboxes** for bulk operations (revoke all, set plan, CSV export)
 
 ### Firestore Collections
 
 | Collection | Purpose |
 | ---------- | ------- |
 | `site_settings/global.monetization` | Kill switches, quotas, donation instructions |
-| `user_plans/{uid}` | Active plan per user |
+| `user_plans/{uid}` | Active plan per user (write: server-only) |
+| `user_plans/{uid}/history/{id}` | Plan change history timeline |
 | `ai_usage_daily/{uid}_{YYYYMMDD}` | Daily AI usage counters |
+| `ai_logs/{id}` | Anti-abuse AI request logs (uid, plan, chars, latency) |
 | `donation_requests/{id}` | User donation requests |
 
 ### Storage Rules

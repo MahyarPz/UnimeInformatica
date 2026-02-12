@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Hook to load the current user's plan from user_plans/{uid}.
- * Falls back to 'free' if missing or expired.
+ * Falls back to 'free' if missing, expired, or revoked.
  */
 export function useUserPlan() {
   const { user } = useAuth();
@@ -31,17 +31,23 @@ export function useUserPlan() {
           const data = snap.data() as UserPlan;
           setPlan(data);
 
-          // Check expiry
-          if (data.expiresAt) {
-            const expiryDate = data.expiresAt.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
-            if (expiryDate < new Date()) {
-              setEffectiveTier('free');
+          // If status is revoked or expired, treat as free
+          if (data.status === 'revoked' || data.status === 'expired') {
+            setEffectiveTier('free');
+          } else {
+            // Check expiry (endsAt or legacy expiresAt)
+            const expiryField = data.endsAt ?? data.expiresAt;
+            if (expiryField) {
+              const expiryDate = expiryField.toDate ? expiryField.toDate() : new Date(expiryField);
+              if (expiryDate < new Date()) {
+                setEffectiveTier('free');
+              } else {
+                setEffectiveTier(data.plan);
+              }
             } else {
+              // null = lifetime
               setEffectiveTier(data.plan);
             }
-          } else {
-            // null expiresAt = lifetime
-            setEffectiveTier(data.plan);
           }
         } else {
           setPlan(null);

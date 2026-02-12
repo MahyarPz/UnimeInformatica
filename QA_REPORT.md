@@ -348,3 +348,102 @@ All 16 admin sub-pages were reviewed. Key finding:
 - 🔵 **LOW / INFO** — Minor issue or improvement opportunity
 - ✅ **FIXED** — Patched in commit `a72620a`
 - ⚠️ **NOTED** — Documented for manual follow-up
+
+---
+
+## Section H — Production-Grade Monetization (Post-Audit Upgrade)
+
+**Date:** 2025-01-XX
+**Scope:** Monetization system overhaul — server-side plan management, admin UI rebuild, per-user AI controls, anti-abuse logging
+
+### H1. Data Model Enhancements
+
+| Change | Status |
+|--------|--------|
+| `UserPlan` extended with `status`, `source`, `startedAt`, `endsAt`, `updatedBy`, AI overrides (`bonusTokens`, `aiBanned`, `aiQuotaOverride`) | ✅ DONE |
+| `UserProfile` denormalized with `plan`, `planStatus`, `planUpdatedAt`, `planEndsAt`, `planSource` | ✅ DONE |
+| New type `PlanHistoryEntry` for `user_plans/{uid}/history/{id}` subcollection | ✅ DONE |
+| New type `AILogEntry` for `ai_logs/{id}` collection | ✅ DONE |
+| Backward compat: `expiresAt` still read alongside new `endsAt` | ✅ DONE |
+
+### H2. Cloud Functions (Server-Side Plan Management)
+
+| Function | Type | Description | Status |
+|----------|------|-------------|--------|
+| `adminSetUserPlan` | Callable | Admin grants/changes plan; writes user_plans + users (denorm) + history + audit | ✅ DONE |
+| `adminRevokeUserPlan` | Callable | Admin revokes plan → free; writes denorm + history + audit | ✅ DONE |
+| `adminSetUserAIOverrides` | Callable | Sets bonusTokens, aiBanned, aiQuotaOverride on user_plans doc | ✅ DONE |
+| `dailyPlanExpiration` | Scheduled (00:05 Europe/Rome) | Finds active plans with endsAt < now, expires them, syncs `users`, writes history + audit | ✅ DONE |
+
+### H3. Firestore Security Rules
+
+| Change | Status |
+|--------|--------|
+| `user_plans/{uid}` — `allow write: if false` (forces server-side only via Cloud Functions) | ✅ DONE |
+| `user_plans/{uid}/history/{historyId}` — read: owner or admin, write: false | ✅ DONE |
+| `ai_logs/{logId}` — read: admin only, write: false | ✅ DONE |
+| 5 new composite indexes for user_plans, donation_requests, history | ✅ DONE |
+
+### H4. Admin Monetization Page (Rebuilt)
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| KPI Cards | Active Pro, Active Supporter, Total Paid, Revoked/Expired, Revenue (TBD) | ✅ DONE |
+| Users & Plans Tab | Full user table with search, plan/status filters, checkboxes | ✅ DONE |
+| Plan/Status Badges | Color-coded FREE/SUPPORTER/PRO + ACTIVE/REVOKED/EXPIRED | ✅ DONE |
+| Quick Actions | Per-row buttons: Upgrade to Supp/Pro, Revoke, Edit, Details | ✅ DONE |
+| Change Plan Dialog | Select plan, duration (7d/30d/90d/1y/lifetime), reason | ✅ DONE |
+| Bulk Actions | Multi-select → Revoke All / Set Plan / CSV Export | ✅ DONE |
+| Plan Details Drawer | Shows current plan, status, source, endsAt, remaining days, reason | ✅ DONE |
+| Per-User AI Controls | AI Banned switch, Bonus Tokens, Quota Override — saved via Cloud Function | ✅ DONE |
+| Plan History Timeline | Chronological old→new badges with source, reason, actor | ✅ DONE |
+| Donations Tab | Filter by status, review dialog with approve/reject, proof viewer, Cloud Function approval | ✅ DONE |
+| Settings Tab | Kill switches, AI quotas, donation instructions, payment links JSON | ✅ DONE |
+| All mutations via Cloud Functions | No more client-side `setDoc` on `user_plans` | ✅ DONE |
+
+### H5. Users & Roles Page
+
+| Change | Status |
+|--------|--------|
+| Plan badges (PRO/SUPPORTER) shown next to each user | ✅ DONE |
+
+### H6. AI Endpoint (`/api/ai/chat`)
+
+| Enhancement | Status |
+|-------------|--------|
+| 5-layer gating: global kill → paid features → plan status → per-user aiBanned → quota | ✅ DONE |
+| Per-user overrides: `bonusTokens` adds to quota, `aiQuotaOverride` replaces base quota | ✅ DONE |
+| `ai_logs` collection: uid, plan, promptChars, responseChars, model, latencyMs, status | ✅ DONE |
+| Backward compat: reads both `endsAt` and `expiresAt` | ✅ DONE |
+
+### H7. User-Facing Profile Page
+
+| Change | Status |
+|--------|--------|
+| Plan badge (PRO/SUPPORTER/Free) shown on profile | ✅ DONE |
+| Expiry date displayed if applicable | ✅ DONE |
+
+### H8. Testing Checklist
+
+#### Admin Tests
+- [ ] Grant Supporter to a user → check denorm on `users` doc + history entry
+- [ ] Upgrade Supporter → Pro → verify badges update
+- [ ] Revoke plan → verify status=revoked, user shows Free
+- [ ] Set AI Banned → verify `/api/ai/chat` returns 403
+- [ ] Set Bonus Tokens → verify quota increases
+- [ ] Bulk revoke 2+ users → all become Free
+- [ ] CSV export → file downloads with correct data
+- [ ] Approve donation → plan activates via Cloud Function
+- [ ] Reject donation → request status updates
+
+#### Scheduled Function Tests
+- [ ] Deploy `dailyPlanExpiration` → create a plan with endsAt in the past → run manually → verify expired
+
+#### Security Tests
+- [ ] Non-admin calling `adminSetUserPlan` → should fail with permission-denied
+- [ ] Client-side `setDoc` on `user_plans` → should fail (rules block)
+- [ ] `ai_logs` not readable by non-admin → verify
+
+#### User-Facing Tests
+- [ ] Profile page shows correct plan badge and expiry
+- [ ] AI chat respects per-user overrides

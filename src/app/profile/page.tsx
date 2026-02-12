@@ -7,15 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Flame, Target, TrendingUp, Calendar, Award, BookOpen } from 'lucide-react';
+import { Flame, Target, TrendingUp, Calendar, Award, BookOpen, Crown, Zap } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { t } from '@/lib/i18n';
+import { useUserPlan } from '@/lib/hooks/useUserPlan';
 
 export default function ProfilePage() {
   const { user, userProfile, loading } = useAuth();
   const router = useRouter();
+  const { plan, expiresAt, loading: planLoading } = useUserPlan();
 
   if (loading) return <div className="min-h-[60vh] flex items-center justify-center"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>;
   if (!user || !userProfile) { router.push('/login'); return null; }
@@ -42,7 +44,10 @@ export default function ProfilePage() {
                 )}
                 <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
                   <Badge variant="secondary">{userProfile.role}</Badge>
-                  {userProfile.supporterTier && <Badge variant="default">Supporter</Badge>}
+                  {plan === 'pro' && <Badge className="bg-amber-100 text-amber-700"><Crown className="h-3 w-3 mr-1" />PRO</Badge>}
+                  {plan === 'supporter' && <Badge className="bg-blue-100 text-blue-700"><Zap className="h-3 w-3 mr-1" />SUPPORTER</Badge>}
+                  {plan === 'free' && <Badge variant="outline">Free</Badge>}
+                  {expiresAt && <span className="text-xs text-muted-foreground self-center">expires {expiresAt.toLocaleDateString()}</span>}
                 </div>
                 {userProfile.bio && (
                   <p className="text-sm text-muted-foreground mt-3">{userProfile.bio}</p>

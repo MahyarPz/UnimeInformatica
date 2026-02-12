@@ -84,6 +84,12 @@ export interface UserProfile {
   showDisplayName: boolean;
   showContributions: boolean;
   supporterTier?: string;
+  // Denormalized plan fields (A1)
+  plan?: UserPlanTier;
+  planStatus?: UserPlanStatus;
+  planUpdatedAt?: any;
+  planEndsAt?: any | null;
+  planSource?: UserPlanSource;
   createdAt: any;
   updatedAt: any;
   lastLoginAt?: any;
@@ -555,16 +561,67 @@ export const DEFAULT_MONETIZATION_SETTINGS: SiteSettingsMonetization = {
   paymentLinks: [],
 };
 
-/** user_plans/{uid} */
+/** user_plans/{uid} — single source of truth for plan status */
+export type UserPlanStatus = 'active' | 'revoked' | 'expired';
+export type UserPlanSource = 'admin_grant' | 'donation' | 'promo' | 'migration';
+
 export interface UserPlan {
   uid: string;
   plan: UserPlanTier;
-  expiresAt: any | null; // Timestamp | null (null = lifetime)
-  activatedBy: string;
-  activatedByUsername: string;
-  reason?: string;
-  createdAt: any;
+  status: UserPlanStatus;
+  source: UserPlanSource;
+  startedAt: any;
+  endsAt: any | null;       // Timestamp | null (null = lifetime)
   updatedAt: any;
+  updatedBy: string;         // uid of admin or "system"
+  reason?: string;
+  // Per-user AI overrides (B8)
+  bonusTokens?: number;      // adds to daily quota
+  aiBanned?: boolean;        // blocks AI even if Pro
+  aiQuotaOverride?: number | null; // optional hard override
+  // Legacy compat
+  expiresAt?: any | null;
+  activatedBy?: string;
+  activatedByUsername?: string;
+  createdAt?: any;
+}
+
+/** Denormalized plan fields on users/{uid} for fast listing (A1) */
+export interface UserPlanDenormalized {
+  plan: UserPlanTier;
+  planStatus: UserPlanStatus;
+  planUpdatedAt: any;
+  planEndsAt?: any | null;
+  planSource?: UserPlanSource;
+}
+
+/** user_plans/{uid}/history/{historyId} — plan change timeline (B6) */
+export interface PlanHistoryEntry {
+  id?: string;
+  oldPlan: UserPlanTier;
+  newPlan: UserPlanTier;
+  oldStatus: UserPlanStatus;
+  newStatus: UserPlanStatus;
+  changedBy: string;         // uid or "system"
+  changedByUsername?: string;
+  reason?: string;
+  source: UserPlanSource;
+  endsAt: any | null;
+  createdAt: any;
+}
+
+/** ai_logs/{id} — AI request metadata for debugging/cost (B10) */
+export interface AILogEntry {
+  id?: string;
+  uid: string;
+  plan: UserPlanTier;
+  promptChars: number;
+  responseChars: number;
+  createdAt: any;
+  status: 'success' | 'error' | 'blocked';
+  model: string;
+  latencyMs: number;
+  dateKey: string;
 }
 
 /** ai_usage_daily/{uid_YYYYMMDD} */

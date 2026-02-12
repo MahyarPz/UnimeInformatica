@@ -6,6 +6,305 @@ admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
 
+// ─── Helper: verify caller is admin ────────────────────────
+async function verifyAdmin(context: functions.https.CallableContext): Promise<string> {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not authenticated');
+  const role = context.auth.token.role;
+  if (role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can perform this action');
+  }
+  return context.auth.uid;
+}
+
+// ─── Helper: get username from uid ─────────────────────────
+async function getUsername(uid: string): Promise<string> {
+  const snap = await db.doc(`users/${uid}`).get();
+  return snap.exists ? (snap.data()?.username || uid) : uid;
+}
+
+// ─── adminSetUserPlan (A2) ─────────────────────────────────
+// Callable: adminSetUserPlan({ targetUid, plan, status?, endsAt?, reason?, source? })
+export const adminSetUserPlan = functions.https.onCall(async (data, context) => {
+  const adminUid = await verifyAdmin(context);
+  const { targetUid, plan, status, endsAt, reason, source } = data;
+
+  // Validate inputs
+  if (!targetUid || typeof targetUid !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required');
+  }
+  const validPlans = ['free', 'supporter', 'pro'];
+  if (!plan || !validPlans.includes(plan)) {
+    throw new functions.https.HttpsError('invalid-argument', 'plan must be free, supporter, or pro');
+  }
+  const validStatuses = ['active', 'revoked', 'expired'];
+  const finalStatus = status && validStatuses.includes(status) ? status : 'active';
+  const validSources = ['admin_grant', 'donation', 'promo', 'migration'];
+  const finalSource = source && validSources.includes(source) ? source : 'admin_grant';
+
+  // Compute endsAt
+  let endsAtTimestamp: admin.firestore.Timestamp | null = null;
+  if (endsAt) {
+    endsAtTimestamp = admin.firestore.Timestamp.fromDate(new Date(endsAt));
+  }
+
+  const adminUsername = await getUsername(adminUid);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  // Read old plan for history
+  const oldPlanSnap = await db.doc(`user_plans/${targetUid}`).get();
+  const oldData = oldPlanSnap.exists ? oldPlanSnap.data()! : { plan: 'free', status: 'active' };
+
+  const batch = db.batch();
+
+  // 1) Write user_plans/{targetUid}
+  const planRef = db.doc(`user_plans/${targetUid}`);
+  batch.set(planRef, {
+    uid: targetUid,
+    plan,
+    status: finalStatus,
+    source: finalSource,
+    startedAt: oldPlanSnap.exists ? (oldData.startedAt || now) : now,
+    endsAt: endsAtTimestamp,
+    updatedAt: now,
+    updatedBy: adminUid,
+    reason: reason || '',
+  }, { merge: false });
+
+  // 2) Denormalize on users/{targetUid}
+  const userRef = db.doc(`users/${targetUid}`);
+  batch.update(userRef, {
+    plan,
+    planStatus: finalStatus,
+    planUpdatedAt: now,
+    planEndsAt: endsAtTimestamp,
+    planSource: finalSource,
+    updatedAt: now,
+  });
+
+  // 3) Write plan history
+  const historyRef = db.collection(`user_plans/${targetUid}/history`).doc();
+  batch.set(historyRef, {
+    oldPlan: oldData.plan || 'free',
+    newPlan: plan,
+    oldStatus: oldData.status || 'active',
+    newStatus: finalStatus,
+    changedBy: adminUid,
+    changedByUsername: adminUsername,
+    reason: reason || '',
+    source: finalSource,
+    endsAt: endsAtTimestamp,
+    createdAt: now,
+  });
+
+  // 4) Audit log
+  const auditRef = db.collection('audit_log').doc();
+  batch.set(auditRef, {
+    action: 'monetization.plan_set',
+    category: 'monetization',
+    actorUid: adminUid,
+    actorUsername: adminUsername,
+    actorRole: 'admin',
+    targetType: 'user_plan',
+    targetId: targetUid,
+    details: {
+      oldPlan: oldData.plan || 'free',
+      newPlan: plan,
+      oldStatus: oldData.status || 'active',
+      newStatus: finalStatus,
+      source: finalSource,
+      reason: reason || '',
+      endsAt: endsAt || null,
+    },
+    timestamp: now,
+  });
+
+  await batch.commit();
+
+  return { success: true, plan, status: finalStatus, endsAt: endsAt || null };
+});
+
+// ─── adminRevokeUserPlan (A2) ──────────────────────────────
+export const adminRevokeUserPlan = functions.https.onCall(async (data, context) => {
+  const adminUid = await verifyAdmin(context);
+  const { targetUid, reason } = data;
+
+  if (!targetUid || typeof targetUid !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required');
+  }
+
+  const adminUsername = await getUsername(adminUid);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  const oldPlanSnap = await db.doc(`user_plans/${targetUid}`).get();
+  const oldData = oldPlanSnap.exists ? oldPlanSnap.data()! : { plan: 'free', status: 'active' };
+
+  const batch = db.batch();
+
+  batch.set(db.doc(`user_plans/${targetUid}`), {
+    uid: targetUid,
+    plan: 'free',
+    status: 'revoked',
+    source: 'admin_grant',
+    startedAt: now,
+    endsAt: null,
+    updatedAt: now,
+    updatedBy: adminUid,
+    reason: reason || 'Revoked by admin',
+  }, { merge: false });
+
+  batch.update(db.doc(`users/${targetUid}`), {
+    plan: 'free',
+    planStatus: 'revoked',
+    planUpdatedAt: now,
+    planEndsAt: null,
+    planSource: 'admin_grant',
+    updatedAt: now,
+  });
+
+  batch.set(db.collection(`user_plans/${targetUid}/history`).doc(), {
+    oldPlan: oldData.plan || 'free',
+    newPlan: 'free',
+    oldStatus: oldData.status || 'active',
+    newStatus: 'revoked',
+    changedBy: adminUid,
+    changedByUsername: adminUsername,
+    reason: reason || 'Revoked by admin',
+    source: 'admin_grant',
+    endsAt: null,
+    createdAt: now,
+  });
+
+  batch.set(db.collection('audit_log').doc(), {
+    action: 'monetization.plan_revoked',
+    category: 'monetization',
+    actorUid: adminUid,
+    actorUsername: adminUsername,
+    actorRole: 'admin',
+    targetType: 'user_plan',
+    targetId: targetUid,
+    details: {
+      oldPlan: oldData.plan || 'free',
+      reason: reason || 'Revoked by admin',
+    },
+    timestamp: now,
+  });
+
+  await batch.commit();
+  return { success: true };
+});
+
+// ─── adminSetUserAIOverrides (B8) ──────────────────────────
+export const adminSetUserAIOverrides = functions.https.onCall(async (data, context) => {
+  const adminUid = await verifyAdmin(context);
+  const { targetUid, bonusTokens, aiBanned, aiQuotaOverride } = data;
+
+  if (!targetUid || typeof targetUid !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required');
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const updates: Record<string, any> = { updatedAt: now, updatedBy: adminUid };
+  if (typeof bonusTokens === 'number') updates.bonusTokens = bonusTokens;
+  if (typeof aiBanned === 'boolean') updates.aiBanned = aiBanned;
+  if (aiQuotaOverride !== undefined) updates.aiQuotaOverride = aiQuotaOverride;
+
+  await db.doc(`user_plans/${targetUid}`).set(updates, { merge: true });
+
+  const adminUsername = await getUsername(adminUid);
+  await db.collection('audit_log').add({
+    action: 'monetization.ai_overrides_set',
+    category: 'monetization',
+    actorUid: adminUid,
+    actorUsername: adminUsername,
+    actorRole: 'admin',
+    targetType: 'user_plan',
+    targetId: targetUid,
+    details: { bonusTokens, aiBanned, aiQuotaOverride },
+    timestamp: now,
+  });
+
+  return { success: true };
+});
+
+// ─── Scheduled: Daily Plan Expiration (B7) ─────────────────
+// Runs every day at 00:05 Europe/Rome
+export const dailyPlanExpiration = functions.pubsub
+  .schedule('5 0 * * *')
+  .timeZone('Europe/Rome')
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+    const snapshot = await db.collection('user_plans')
+      .where('status', '==', 'active')
+      .where('endsAt', '!=', null)
+      .where('endsAt', '<', now)
+      .get();
+
+    if (snapshot.empty) {
+      console.log('No expired plans found.');
+      return;
+    }
+
+    console.log(`Found ${snapshot.size} expired plan(s). Processing...`);
+
+    const serverNow = admin.firestore.FieldValue.serverTimestamp();
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const uid = doc.id;
+
+      const batch = db.batch();
+
+      // Expire the plan
+      batch.update(db.doc(`user_plans/${uid}`), {
+        plan: 'free',
+        status: 'expired',
+        updatedAt: serverNow,
+        updatedBy: 'system',
+      });
+
+      // Sync denormalized user fields
+      batch.update(db.doc(`users/${uid}`), {
+        plan: 'free',
+        planStatus: 'expired',
+        planUpdatedAt: serverNow,
+        updatedAt: serverNow,
+      });
+
+      // Plan history
+      batch.set(db.collection(`user_plans/${uid}/history`).doc(), {
+        oldPlan: data.plan || 'free',
+        newPlan: 'free',
+        oldStatus: 'active',
+        newStatus: 'expired',
+        changedBy: 'system',
+        changedByUsername: 'system',
+        reason: 'Auto-expired: endsAt reached',
+        source: data.source || 'admin_grant',
+        endsAt: data.endsAt,
+        createdAt: serverNow,
+      });
+
+      // Audit log
+      batch.set(db.collection('audit_log').doc(), {
+        action: 'monetization.plan_expired',
+        category: 'monetization',
+        actorUid: 'system',
+        actorUsername: 'system',
+        actorRole: 'system',
+        targetType: 'user_plan',
+        targetId: uid,
+        details: {
+          oldPlan: data.plan,
+          reason: 'Auto-expired',
+        },
+        timestamp: serverNow,
+      });
+
+      await batch.commit();
+      console.log(`Expired plan for uid=${uid} (was ${data.plan})`);
+    }
+  });
+
 // ─── Bootstrap Admin ────────────────────────────────────────
 // One-time function to set the first admin. Called via HTTP.
 // Set BOOTSTRAP_ADMIN_EMAIL in Firebase config.

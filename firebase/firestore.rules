@@ -216,13 +216,26 @@ service cloud.firestore {
     // ─── User Plans (monetization) ────────────────────────
     match /user_plans/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-      allow write: if isAdmin();
+      // Only Cloud Functions / Admin SDK write plans (force server-side)
+      allow write: if false;
+
+      // Plan history sub-collection
+      match /history/{historyId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if false; // Cloud Functions only
+      }
     }
 
     // ─── AI Usage Daily (server-only writes) ──────────────
     match /ai_usage_daily/{docId} {
       allow read: if isAuthenticated()
         && (resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if false; // Server / Admin SDK only
+    }
+
+    // ─── AI Logs (server-only, admin read) ────────────────
+    match /ai_logs/{logId} {
+      allow read: if isAdmin();
       allow write: if false; // Server / Admin SDK only
     }
 
