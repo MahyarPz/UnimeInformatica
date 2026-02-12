@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
-import { Question, ExamSession, PracticeMode, SessionAnswer } from '@/lib/types';
+import { Question, ExamSession, PracticeMode, SessionAnswer, PracticeSettings } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +45,7 @@ function PracticeSessionInner() {
   const [showResult, setShowResult] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [practiceSettings, setPracticeSettings] = useState<PracticeSettings | null>(null);
   const [startTime] = useState(Date.now());
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
 
@@ -54,6 +55,18 @@ function PracticeSessionInner() {
 
     const loadQuestions = async () => {
       try {
+        // Load course practice settings
+        let courseSettings: PracticeSettings | null = null;
+        try {
+          const settingsSnap = await getDoc(doc(db, 'practice_settings', courseId));
+          if (settingsSnap.exists()) {
+            courseSettings = settingsSnap.data() as PracticeSettings;
+            setPracticeSettings(courseSettings);
+          }
+        } catch (e) {
+          console.error('Failed to load practice settings:', e);
+        }
+
         // Check for resume session
         if (resumeSessionId) {
           const sessionDoc = await getDoc(doc(db, 'exam_sessions', resumeSessionId));
@@ -123,12 +136,34 @@ function PracticeSessionInner() {
           return question;
         });
 
-        // Shuffle
-        allQuestions = allQuestions.sort(() => Math.random() - 0.5);
+        // Shuffle questions if enabled (default: true)
+        const shouldShuffle = courseSettings?.shuffleQuestions !== false;
+        if (shouldShuffle) {
+          allQuestions = allQuestions.sort(() => Math.random() - 0.5);
+        }
 
-        // Limit based on mode
-        const limit = mode === 'quick' ? 10 : mode === 'mock_exam' ? 30 : 15;
+        // Limit based on mode, using practice settings defaultQuestionCount as base
+        const defaultCount = courseSettings?.defaultQuestionCount || 10;
+        const limit = mode === 'quick' ? defaultCount : mode === 'mock_exam' ? Math.min(defaultCount * 3, allQuestions.length) : Math.round(defaultCount * 1.5);
         allQuestions = allQuestions.slice(0, limit);
+
+        // Shuffle options within each question if enabled (default: true)
+        const shouldShuffleOptions = courseSettings?.shuffleOptions !== false;
+        if (shouldShuffleOptions) {
+          allQuestions = allQuestions.map((q) => {
+            if (q.type === 'mcq' && Array.isArray(q.options)) {
+              const indices = q.options.map((_, i) => i);
+              for (let i = indices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [indices[i], indices[j]] = [indices[j], indices[i]];
+              }
+              const shuffledOptions = indices.map((i) => q.options![i]);
+              const newCorrectIndex = indices.indexOf(q.correctIndex ?? 0);
+              return { ...q, options: shuffledOptions, correctIndex: newCorrectIndex };
+            }
+            return q;
+          });
+        }
 
         if (allQuestions.length === 0) {
           setLoading(false);
@@ -489,8 +524,8 @@ function PracticeSessionInner() {
                 </div>
               )}
 
-              {/* Explanation */}
-              {showResult && currentQuestion.explanation && (
+              {/* Explanation — only if showExplanations is enabled in practice settings */}
+              {showResult && currentQuestion.explanation && (practiceSettings?.showExplanations !== false) && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -501,8 +536,8 @@ function PracticeSessionInner() {
                 </motion.div>
               )}
 
-              {/* Hint */}
-              {!showResult && currentQuestion.hints && currentQuestion.hints.length > 0 && (
+              {/* Hint — only if allowHints is enabled in practice settings */}
+              {!showResult && (practiceSettings?.allowHints !== false) && currentQuestion.hints && currentQuestion.hints.length > 0 && (
                 <div className="mt-3">
                   <Button variant="ghost" size="sm" onClick={() => setShowHint(!showHint)}>
                     <Lightbulb className="h-4 w-4 mr-1" /> {showHint ? 'Hide' : 'Show'} Hint
