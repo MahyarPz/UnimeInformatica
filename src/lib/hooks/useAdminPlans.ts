@@ -5,15 +5,25 @@ import {
   collection, query, orderBy, onSnapshot, doc, getDocs, where,
   limit as firestoreLimit, getDoc,
 } from 'firebase/firestore';
-import { db, functions, httpsCallable } from '@/lib/firebase/config';
+import { db } from '@/lib/firebase/config';
+import { auth } from '@/lib/firebase/config';
 import {
   UserProfile, UserPlan, PlanHistoryEntry, UserPlanTier, UserPlanStatus, UserPlanSource,
 } from '@/lib/types';
 
-// ─── Cloud Function wrappers ──────────────────────────────
-const setUserPlanFn = httpsCallable(functions, 'adminSetUserPlan');
-const revokeUserPlanFn = httpsCallable(functions, 'adminRevokeUserPlan');
-const setAIOverridesFn = httpsCallable(functions, 'adminSetUserAIOverrides');
+// ─── API helper ───────────────────────────────────────────
+async function callPlanApi(body: Record<string, any>) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch('/api/admin/plans', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
 
 export interface SetUserPlanParams {
   targetUid: string;
@@ -25,13 +35,11 @@ export interface SetUserPlanParams {
 }
 
 export async function adminSetUserPlan(params: SetUserPlanParams) {
-  const result = await setUserPlanFn(params);
-  return result.data as { success: boolean; plan: string; status: string; endsAt: string | null };
+  return callPlanApi({ action: 'setPlan', ...params }) as Promise<{ success: boolean; plan: string; status: string; endsAt: string | null }>;
 }
 
 export async function adminRevokeUserPlan(targetUid: string, reason?: string) {
-  const result = await revokeUserPlanFn({ targetUid, reason });
-  return result.data as { success: boolean };
+  return callPlanApi({ action: 'revokePlan', targetUid, reason }) as Promise<{ success: boolean }>;
 }
 
 export async function adminSetAIOverrides(targetUid: string, overrides: {
@@ -39,8 +47,7 @@ export async function adminSetAIOverrides(targetUid: string, overrides: {
   aiBanned?: boolean;
   aiQuotaOverride?: number | null;
 }) {
-  const result = await setAIOverridesFn({ targetUid, ...overrides });
-  return result.data as { success: boolean };
+  return callPlanApi({ action: 'setAIOverrides', targetUid, ...overrides }) as Promise<{ success: boolean }>;
 }
 
 // ─── KPI stats ────────────────────────────────────────────

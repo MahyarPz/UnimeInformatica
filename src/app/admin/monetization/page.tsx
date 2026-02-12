@@ -52,7 +52,9 @@ function PlanBadge({ plan }: { plan?: string }) {
   return <Badge variant="secondary" className="text-xs">{(plan ?? '').toUpperCase()}</Badge>;
 }
 
-function StatusBadge({ status }: { status?: string }) {
+function StatusBadge({ status, plan }: { status?: string; plan?: string }) {
+  // Users without a paid plan don't need a status badge
+  if (!plan || plan === 'free') return <span className="text-xs text-muted-foreground">—</span>;
   if (!status || status === 'active') return <Badge className="bg-green-100 text-green-700 text-xs">ACTIVE</Badge>;
   if (status === 'revoked') return <Badge className="bg-red-100 text-red-700 text-xs">REVOKED</Badge>;
   if (status === 'expired') return <Badge className="bg-gray-100 text-gray-600 text-xs">EXPIRED</Badge>;
@@ -379,9 +381,9 @@ export default function AdminMonetizationPage() {
                     </div>
                     <div><Badge variant="outline" className="text-xs">{u.role}</Badge></div>
                     <div><PlanBadge plan={u.plan} /></div>
-                    <div><StatusBadge status={u.planStatus} /></div>
+                    <div><StatusBadge status={u.planStatus} plan={u.plan} /></div>
                     <div className="text-xs text-muted-foreground">
-                      {u.planEndsAt ? (typeof u.planEndsAt?.toDate === 'function' ? u.planEndsAt.toDate().toLocaleDateString() : new Date(u.planEndsAt as any).toLocaleDateString()) : '∞'}
+                      {(!u.plan || u.plan === 'free') ? '—' : u.planEndsAt ? (typeof u.planEndsAt?.toDate === 'function' ? u.planEndsAt.toDate().toLocaleDateString() : new Date(u.planEndsAt as any).toLocaleDateString()) : '∞'}
                     </div>
                     <div className="flex items-center gap-1 flex-wrap">
                       {(!u.plan || u.plan === 'free') && (
@@ -702,7 +704,7 @@ function PlanDetailsDrawer({ uid, onClose, addToast }: { uid: string | null; onC
             {/* Current plan summary */}
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs text-muted-foreground">Plan</Label><div className="mt-1"><PlanBadge plan={plan?.plan} /></div></div>
-              <div><Label className="text-xs text-muted-foreground">Status</Label><div className="mt-1"><StatusBadge status={plan?.status} /></div></div>
+              <div><Label className="text-xs text-muted-foreground">Status</Label><div className="mt-1"><StatusBadge status={plan?.status} plan={plan?.plan} /></div></div>
               <div><Label className="text-xs text-muted-foreground">Ends At</Label><p className="text-sm mt-1">{endsDate ? endsDate.toLocaleDateString() : '∞ Lifetime'}</p></div>
               <div><Label className="text-xs text-muted-foreground">Remaining</Label><p className="text-sm mt-1">{timeRemaining !== null ? `${timeRemaining} day(s)` : '∞'}</p></div>
               <div><Label className="text-xs text-muted-foreground">Source</Label><p className="text-sm mt-1">{plan?.source || '-'}</p></div>
@@ -742,7 +744,7 @@ function PlanDetailsDrawer({ uid, onClose, addToast }: { uid: string | null; onC
                   {history.map((h) => (
                     <div key={h.id} className="border-l-2 border-primary/30 pl-3 py-1">
                       <div className="flex items-center gap-2">
-                        <PlanBadge plan={h.oldPlan} /><span className="text-muted-foreground">→</span><PlanBadge plan={h.newPlan} /><StatusBadge status={h.newStatus} />
+                        <PlanBadge plan={h.oldPlan} /><span className="text-muted-foreground">→</span><PlanBadge plan={h.newPlan} /><StatusBadge status={h.newStatus} plan={h.newPlan} />
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">by {h.changedByUsername || h.changedBy} · {h.source}{h.reason && ` — "${h.reason}"`}</p>
                       <p className="text-xs text-muted-foreground">{h.createdAt?.toDate ? h.createdAt.toDate().toLocaleString() : ''}</p>
