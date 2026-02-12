@@ -200,7 +200,7 @@ export default function AdminMonetizationPage() {
   const handleBulkRevoke = async () => {
     setBulkLoading(true);
     let success = 0;
-    for (const uid of selectedUids) { try { await adminRevokeUserPlan(uid, bulkReason || 'Bulk revoke'); success++; } catch { /* skip */ } }
+    for (const uid of Array.from(selectedUids)) { try { await adminRevokeUserPlan(uid, bulkReason || 'Bulk revoke'); success++; } catch { /* skip */ } }
     setBulkLoading(false); setBulkDialog(null); setSelectedUids(new Set());
     addToast({ title: `Revoked ${success} user(s)`, variant: 'success' });
   };
@@ -210,7 +210,7 @@ export default function AdminMonetizationPage() {
     let endsAt: string | null = null;
     if (bulkDuration !== 'lifetime') { const d = new Date(); d.setDate(d.getDate() + parseInt(bulkDuration)); endsAt = d.toISOString(); }
     let success = 0;
-    for (const uid of selectedUids) { try { await adminSetUserPlan({ targetUid: uid, plan: bulkPlan, endsAt, reason: bulkReason || 'Bulk set', source: 'admin_grant' }); success++; } catch { /* skip */ } }
+    for (const uid of Array.from(selectedUids)) { try { await adminSetUserPlan({ targetUid: uid, plan: bulkPlan, endsAt, reason: bulkReason || 'Bulk set', source: 'admin_grant' }); success++; } catch { /* skip */ } }
     setBulkLoading(false); setBulkDialog(null); setSelectedUids(new Set());
     addToast({ title: `Set plan for ${success} user(s)`, variant: 'success' });
   };
