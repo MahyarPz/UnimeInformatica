@@ -16,6 +16,24 @@ import { initializeApp, cert, ServiceAccount } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as path from 'path';
 
+// Load .env.local for local development
+import * as fs from 'fs';
+const envPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex > 0) {
+        const key = trimmed.slice(0, eqIndex);
+        const value = trimmed.slice(eqIndex + 1);
+        if (!process.env[key]) process.env[key] = value;
+      }
+    }
+  }
+}
+
 // Initialize Firebase Admin
 // Expects GOOGLE_APPLICATION_CREDENTIALS env var or a service account JSON
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
@@ -26,7 +44,9 @@ try {
   initializeApp({ credential: cert(serviceAccount as ServiceAccount) });
 } catch {
   console.log('No service account found. Using default credentials.');
-  initializeApp();
+  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID
+    || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  initializeApp(projectId ? { projectId } : undefined);
 }
 
 const db = getFirestore();
