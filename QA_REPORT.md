@@ -15,7 +15,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### Patch Summary (commit `a72620a`)
 
 | # | File | Fix |
-|---|------|-----|
+| | | |
 | 1 | `firebase/firestore.rules` | Added missing rules for `exam_sessions`, `questions_private`, `audit_logs`; fixed `user_stats` write rule; fixed notes `authorUid` → `creatorId` |
 | 2 | `firebase/database.rules.json` | Added `'offline'` to allowed presence state values |
 | 3 | `src/lib/firebase/activity.ts` | Fixed collection name `audit_logs` → `audit_log` |
@@ -32,7 +32,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### A1. Firestore Rules (`firebase/firestore.rules`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **No rule for `exam_sessions`** — practice session CRUD silently denied | 🔴 CRITICAL | ✅ FIXED |
 | **No rule for `questions_private`** — dashboard private questions silently denied | 🔴 CRITICAL | ✅ FIXED |
 | **`user_stats` write rule was `false`** — client stats update always fails (Cloud Functions not deployed) | 🔴 CRITICAL | ✅ FIXED |
@@ -43,6 +43,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 | No rule for `lab_sessions` update — users can't update lab progress | 🟡 MEDIUM | ⚠️ NOTED (add update rule when labs ship) |
 
 **Positive findings:**
+
 - Helper functions (`isAuthenticated`, `isAdmin`, `isOwner`, etc.) are well-structured
 - Moderator permission checks via `hasModPermission()` are granular
 - Default deny on unmatched paths (Firestore default)
@@ -51,13 +52,14 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### A2. Realtime Database Rules (`firebase/database.rules.json`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **`onDisconnect` wrote `state: 'offline'` but rule only allowed `'online'\|'idle'`** — disconnect handler always fails, users stuck as "online" | 🔴 CRITICAL | ✅ FIXED |
 | **`role` was written to presence but not validated** — user role exposed to anyone (`.read: true`) | 🟠 HIGH | ✅ FIXED (removed from code) |
 | Presence `.read: true` per-uid — anyone can read who's online and what page they're on | 🟡 MEDIUM | ⚠️ NOTED |
 | No rate-limiting on presence writes | 🔵 LOW | ⚠️ NOTED |
 
 **Positive findings:**
+
 - Write restricted to `$uid === auth.uid` — users can only write own presence
 - Validation rules enforce data shape (`username`, `state`, `lastActive` required)
 - `typing` node properly scoped by room/uid
@@ -65,12 +67,13 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### A3. Storage Rules (`firebase/storage.rules`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | Notes allow any authenticated user to write to any `notes/{courseId}/` path | 🟡 MEDIUM | ⚠️ NOTED |
 | No file type validation on notes upload (only size limit) | 🟡 MEDIUM | ⚠️ NOTED |
 | Default deny (`/{allPaths=**}`) is correct | ✅ GOOD | — |
 
 **Positive findings:**
+
 - Labs restricted to admin/moderator only
 - Avatars restricted to own uid path with image content-type check and 5MB limit
 - Reasonable size limits (50MB notes, 100MB labs, 5MB avatars)
@@ -82,7 +85,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### B1. Firebase Init (`src/lib/firebase/config.ts`, `src/lib/firebase/admin.ts`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | Client SDK init uses `getApps().length === 0` guard — prevents double-init | ✅ GOOD | — |
 | Admin SDK properly guards with `!getApps().length` | ✅ GOOD | — |
 | Admin SDK uses `FIREBASE_ADMIN_*` env vars (not `NEXT_PUBLIC_`) — no client leak | ✅ GOOD | — |
@@ -91,7 +94,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### B2. AuthContext (`src/contexts/AuthContext.tsx`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **Signup race condition:** Auth account created BEFORE Firestore transaction. If transaction fails (username taken), orphaned Auth account persists. Auto-create profile mitigates but assigns generated username. | 🟠 HIGH | ⚠️ NOTED |
 | **No cleanup on failed signup:** If `runTransaction` throws after `createUserWithEmailAndPassword`, no `user.delete()` is called | 🟠 HIGH | ⚠️ NOTED |
 | Username reservation in transaction is atomic (good) | ✅ GOOD | — |
@@ -102,7 +105,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### B3. Admin Layout (`src/app/admin/layout.tsx`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | Dual check: `claims?.role` OR `userProfile?.role` — compensates for missing Cloud Functions claim sync | ✅ GOOD (workaround) | — |
 | Client-side redirect on `!hasAdminAccess` — but no server-side middleware | 🟡 MEDIUM | ⚠️ NOTED |
 | Returns `null` after redirect — prevents flash of admin content | ✅ GOOD | — |
@@ -110,7 +113,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 ### B4. Navigation (`src/components/layout/Navigation.tsx`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | Admin link shown for both `claims?.role` and `userProfile?.role` checks | ✅ GOOD | — |
 | Hides nav on `/admin` paths — avoids double navigation | ✅ GOOD | — |
 
@@ -119,7 +122,7 @@ This audit reviewed **30+ source files** across the entire Unime Informatica Nex
 All 16 admin sub-pages were reviewed. Key finding:
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | Admin pages rely ONLY on layout-level auth check — no per-page permission verification | 🟡 MEDIUM | ⚠️ NOTED |
 | Moderator granular permissions (e.g., `canManageCourses`) are defined in types but NOT checked in individual admin pages | 🟠 HIGH | ⚠️ NOTED |
 | Admin users page correctly checks `isAdmin` before role changes | ✅ GOOD | — |
@@ -132,7 +135,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section C — Signup & Username
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | Username regex on input: `[^a-zA-Z0-9_]` stripped — good client validation | ✅ GOOD | — |
 | Min 3 / Max 20 characters enforced in HTML | ✅ GOOD | — |
 | **No server-side username validation** — malicious client could bypass regex | 🟡 MEDIUM | ⚠️ NOTED |
@@ -145,7 +148,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section D — Public Profiles (`/u/[username]`)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | `publicProfile: false` check prevents display — privacy respected | ✅ GOOD | — |
 | `showDisplayName`, `showContributions` granular privacy flags | ✅ GOOD | — |
 | **Query on `users` collection requires `isAuthenticated()`** — unauthenticated visitors get permission denied, profile page fails silently | 🟠 HIGH | ⚠️ NOTED |
@@ -159,7 +162,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section E — Presence System
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **Role leaked to RTDB** — any user could see admin/mod roles | 🟠 HIGH | ✅ FIXED |
 | **onDisconnect wrote invalid state** — users stuck as "online" forever | 🔴 CRITICAL | ✅ FIXED |
 | Heartbeat every 30s keeps presence fresh | ✅ GOOD | — |
@@ -172,7 +175,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section F — Activity Feed & Audit
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **`audit_logs` vs `audit_log` collection mismatch** — all audit writes silently failed | 🔴 CRITICAL | ✅ FIXED |
 | `logActivity` silently swallows errors with `console.error` — good for non-blocking, but audit failures are invisible | 🟡 MEDIUM | ⚠️ NOTED |
 | Activity events include `actorUid`, `actorUsername`, `actorRole`, `metadata` — comprehensive | ✅ GOOD | — |
@@ -184,7 +187,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section G — Practice Engine
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **No Firestore rule for `exam_sessions`** — entire practice system broken | 🔴 CRITICAL | ✅ FIXED |
 | **`user_stats` writes always denied** — stats never persist | 🔴 CRITICAL | ✅ FIXED |
 | Old-format option normalization (`{A,B,C,D}` → `MCQOption[]`) works correctly | ✅ GOOD | — |
@@ -201,7 +204,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section H — Labs & CSV
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | No CSV parsing/sanitization on upload — CSV injection possible if data is later rendered in formulas | 🟡 MEDIUM | ⚠️ NOTED |
 | Dataset upload restricted to admin/moderator in Storage rules | ✅ GOOD | — |
 | Lab questions use `{ A: '', B: '', C: '', D: '' }` format (different from practice MCQ) — intentional for labs | 🔵 LOW | ⚠️ NOTED |
@@ -212,7 +215,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section I — SSR, Hooks & Routing
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | `export const dynamic = 'force-dynamic'` in root layout — correct for Firebase runtime env vars | ✅ GOOD | — |
 | All pages use `'use client'` — no accidental SSR of Firebase client SDK | ✅ GOOD | — |
 | `useTopics` queried subcollection instead of top-level collection | 🔴 CRITICAL | ✅ FIXED |
@@ -226,7 +229,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section J — XSS & Injection
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **5 uses of `dangerouslySetInnerHTML`** in courses pages (`whatYouLearn`, `syllabus`, `examInfo`, `recommendedResources`) | 🟠 HIGH | ⚠️ NOTED |
 | HTML content is admin-authored (only admins can create/edit courses) — mitigated by trust boundary | 🟡 MEDIUM | — |
 | No DOMPurify or sanitization library in dependencies | 🟡 MEDIUM | ⚠️ NOTED |
@@ -238,7 +241,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section K — Cloud Functions (NOT DEPLOYED)
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | **`onRoleChange` not deployed** — custom claims never sync when roles change in Firestore | 🟠 HIGH | ⚠️ NOTED |
 | **`onUserCreated` sets `role: 'student'`** but `UserRole` type defines `'user'` — mismatch | 🟡 MEDIUM | ⚠️ NOTED |
 | `bootstrapAdmin` function exists but wasn't needed — client-side bootstrap workaround in use | 🔵 INFO | — |
@@ -251,7 +254,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Section L — Type Safety & Code Quality
 
 | Finding | Severity | Status |
-|---------|----------|--------|
+| | | |
 | `UserRole = 'admin' \| 'moderator' \| 'user'` but some code references `'student'` | 🟡 MEDIUM | ✅ FIXED (admin users page) |
 | `PresenceData` had `role` field that was removed from code | 🟡 MEDIUM | ✅ FIXED |
 | `DifficultyLevel = 'easy' \| 'medium' \| 'hard' \| 1 \| 2 \| 3 \| 4 \| 5` — union type, handled correctly throughout | ✅ GOOD | — |
@@ -263,7 +266,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Top 10 Risks to Watch in Production
 
 | # | Risk | Impact | Likelihood | Mitigation |
-|---|------|--------|------------|------------|
+| | | | | |
 | **1** | **Cloud Functions not deployed** — role changes via Firestore don't sync to custom claims. Firestore security rules that check `request.auth.token.role` are stale. | HIGH | CERTAIN | Deploy Cloud Functions or create a Next.js API route (`/api/sync-claims`) that uses Admin SDK to update claims on role change |
 | **2** | **Signup orphaned Auth accounts** — if Firestore transaction fails after Auth creation, orphaned Firebase Auth accounts accumulate | MEDIUM | LIKELY | Add `try/catch` around signup that calls `cred.user.delete()` on transaction failure |
 | **3** | **XSS via `dangerouslySetInnerHTML`** — course HTML fields rendered without sanitization. If an admin account is compromised, stored XSS affects all users | HIGH | LOW (requires admin compromise) | Install `dompurify`, sanitize all HTML fields before rendering |
@@ -280,19 +283,23 @@ All 16 admin sub-pages were reviewed. Key finding:
 ## Files Reviewed (32 total)
 
 ### Security Rules
+
 - `firebase/firestore.rules` ✅
 - `firebase/database.rules.json` ✅
 - `firebase/storage.rules` ✅
 
 ### Firebase Client
+
 - `src/lib/firebase/config.ts` ✅
 - `src/lib/firebase/admin.ts` ✅
 - `src/lib/firebase/activity.ts` ✅
 
 ### Auth & Context
+
 - `src/contexts/AuthContext.tsx` ✅
 
 ### Admin Pages (16)
+
 - `src/app/admin/layout.tsx` ✅
 - `src/app/admin/page.tsx` ✅
 - `src/app/admin/courses/page.tsx` ✅
@@ -311,6 +318,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 - `src/app/admin/monetization/page.tsx` ✅
 
 ### Public Pages
+
 - `src/app/(auth)/login/page.tsx` ✅
 - `src/app/(auth)/signup/page.tsx` ✅
 - `src/app/courses/page.tsx` ✅
@@ -321,6 +329,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 - `src/app/u/[username]/page.tsx` ✅
 
 ### Hooks & Utilities
+
 - `src/lib/hooks/useCourses.ts` ✅
 - `src/lib/hooks/usePresence.ts` ✅
 - `src/lib/hooks/useOnlineUsers.ts` ✅
@@ -329,11 +338,13 @@ All 16 admin sub-pages were reviewed. Key finding:
 - `src/lib/types/index.ts` ✅
 
 ### Layout & Components
+
 - `src/app/layout.tsx` ✅
 - `src/components/layout/Navigation.tsx` ✅
 - `src/components/layout/PresenceWrapper.tsx` ✅
 
 ### Infrastructure
+
 - `firebase/functions/src/index.ts` ✅
 - `next.config.js` ✅
 - `package.json` ✅
@@ -359,7 +370,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ### H1. Data Model Enhancements
 
 | Change | Status |
-|--------|--------|
+| | |
 | `UserPlan` extended with `status`, `source`, `startedAt`, `endsAt`, `updatedBy`, AI overrides (`bonusTokens`, `aiBanned`, `aiQuotaOverride`) | ✅ DONE |
 | `UserProfile` denormalized with `plan`, `planStatus`, `planUpdatedAt`, `planEndsAt`, `planSource` | ✅ DONE |
 | New type `PlanHistoryEntry` for `user_plans/{uid}/history/{id}` subcollection | ✅ DONE |
@@ -369,7 +380,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ### H2. Cloud Functions (Server-Side Plan Management)
 
 | Function | Type | Description | Status |
-|----------|------|-------------|--------|
+| | | | |
 | `adminSetUserPlan` | Callable | Admin grants/changes plan; writes user_plans + users (denorm) + history + audit | ✅ DONE |
 | `adminRevokeUserPlan` | Callable | Admin revokes plan → free; writes denorm + history + audit | ✅ DONE |
 | `adminSetUserAIOverrides` | Callable | Sets bonusTokens, aiBanned, aiQuotaOverride on user_plans doc | ✅ DONE |
@@ -378,7 +389,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ### H3. Firestore Security Rules
 
 | Change | Status |
-|--------|--------|
+| | |
 | `user_plans/{uid}` — `allow write: if false` (forces server-side only via Cloud Functions) | ✅ DONE |
 | `user_plans/{uid}/history/{historyId}` — read: owner or admin, write: false | ✅ DONE |
 | `ai_logs/{logId}` — read: admin only, write: false | ✅ DONE |
@@ -387,7 +398,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ### H4. Admin Monetization Page (Rebuilt)
 
 | Feature | Description | Status |
-|---------|-------------|--------|
+| | | |
 | KPI Cards | Active Pro, Active Supporter, Total Paid, Revoked/Expired, Revenue (TBD) | ✅ DONE |
 | Users & Plans Tab | Full user table with search, plan/status filters, checkboxes | ✅ DONE |
 | Plan/Status Badges | Color-coded FREE/SUPPORTER/PRO + ACTIVE/REVOKED/EXPIRED | ✅ DONE |
@@ -404,13 +415,13 @@ All 16 admin sub-pages were reviewed. Key finding:
 ### H5. Users & Roles Page
 
 | Change | Status |
-|--------|--------|
+| | |
 | Plan badges (PRO/SUPPORTER) shown next to each user | ✅ DONE |
 
 ### H6. AI Endpoint (`/api/ai/chat`)
 
 | Enhancement | Status |
-|-------------|--------|
+| | |
 | 5-layer gating: global kill → paid features → plan status → per-user aiBanned → quota | ✅ DONE |
 | Per-user overrides: `bonusTokens` adds to quota, `aiQuotaOverride` replaces base quota | ✅ DONE |
 | `ai_logs` collection: uid, plan, promptChars, responseChars, model, latencyMs, status | ✅ DONE |
@@ -419,13 +430,14 @@ All 16 admin sub-pages were reviewed. Key finding:
 ### H7. User-Facing Profile Page
 
 | Change | Status |
-|--------|--------|
+| | |
 | Plan badge (PRO/SUPPORTER/Free) shown on profile | ✅ DONE |
 | Expiry date displayed if applicable | ✅ DONE |
 
 ### H8. Testing Checklist
 
 #### Admin Tests
+
 - [ ] Grant Supporter to a user → check denorm on `users` doc + history entry
 - [ ] Upgrade Supporter → Pro → verify badges update
 - [ ] Revoke plan → verify status=revoked, user shows Free
@@ -437,13 +449,16 @@ All 16 admin sub-pages were reviewed. Key finding:
 - [ ] Reject donation → request status updates
 
 #### Scheduled Function Tests
+
 - [ ] Deploy `dailyPlanExpiration` → create a plan with endsAt in the past → run manually → verify expired
 
 #### Security Tests
+
 - [ ] Non-admin calling `adminSetUserPlan` → should fail with permission-denied
 - [ ] Client-side `setDoc` on `user_plans` → should fail (rules block)
 - [ ] `ai_logs` not readable by non-admin → verify
 
 #### User-Facing Tests
+
 - [ ] Profile page shows correct plan badge and expiry
 - [ ] AI chat respects per-user overrides

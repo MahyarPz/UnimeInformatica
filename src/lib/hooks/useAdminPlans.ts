@@ -5,14 +5,10 @@ import {
   collection, query, orderBy, onSnapshot, doc, getDocs, where,
   limit as firestoreLimit, getDoc,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '@/lib/firebase/config';
-import app from '@/lib/firebase/config';
+import { db, functions, httpsCallable } from '@/lib/firebase/config';
 import {
   UserProfile, UserPlan, PlanHistoryEntry, UserPlanTier, UserPlanStatus, UserPlanSource,
 } from '@/lib/types';
-
-const functions = getFunctions(app);
 
 // ─── Cloud Function wrappers ──────────────────────────────
 const setUserPlanFn = httpsCallable(functions, 'adminSetUserPlan');

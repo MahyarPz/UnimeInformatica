@@ -174,7 +174,6 @@ export async function POST(request: NextRequest) {
     const aiQuotas = monetization?.aiQuotas || { free: 0, supporter: 20, pro: 120 };
     let quota = aiQuotaOverride != null ? aiQuotaOverride : (aiQuotas[userTier] ?? 0);
     quota += bonusTokens;
-    const quota = aiQuotas[userTier] ?? 0;
 
     if (quota <= 0) {
       return NextResponse.json(
