@@ -862,27 +862,39 @@ export default function AdminSiteContentPage() {
   const [dirty, setDirty] = useState(false);
   const [initialized, setInitialized] = useState({ home: false, nav: false, footer: false });
 
-  // Sync Firestore → local form once per page
+  // Sync Firestore → local form once per page; fallback to defaults if doc missing
   useEffect(() => {
-    if (home.data && !initialized.home) {
+    if (initialized.home) return;
+    if (home.data) {
       setHomeForm(deepClone(home.data as SiteContentHome));
       setInitialized((p) => ({ ...p, home: true }));
+    } else if (!home.loading) {
+      setHomeForm(deepClone({ ...DEFAULT_HOME_CONTENT, draft: { updatedAt: null, updatedBy: '', version: 0 } } as SiteContentHome));
+      setInitialized((p) => ({ ...p, home: true }));
     }
-  }, [home.data, initialized.home]);
+  }, [home.data, home.loading, initialized.home]);
 
   useEffect(() => {
-    if (nav.data && !initialized.nav) {
+    if (initialized.nav) return;
+    if (nav.data) {
       setNavForm(deepClone(nav.data as SiteContentNav));
       setInitialized((p) => ({ ...p, nav: true }));
+    } else if (!nav.loading) {
+      setNavForm(deepClone({ ...DEFAULT_NAV_CONTENT, draft: { updatedAt: null, updatedBy: '', version: 0 } } as SiteContentNav));
+      setInitialized((p) => ({ ...p, nav: true }));
     }
-  }, [nav.data, initialized.nav]);
+  }, [nav.data, nav.loading, initialized.nav]);
 
   useEffect(() => {
-    if (footer.data && !initialized.footer) {
+    if (initialized.footer) return;
+    if (footer.data) {
       setFooterForm(deepClone(footer.data as SiteContentFooter));
       setInitialized((p) => ({ ...p, footer: true }));
+    } else if (!footer.loading) {
+      setFooterForm(deepClone({ ...DEFAULT_FOOTER_CONTENT, draft: { updatedAt: null, updatedBy: '', version: 0 } } as SiteContentFooter));
+      setInitialized((p) => ({ ...p, footer: true }));
     }
-  }, [footer.data, initialized.footer]);
+  }, [footer.data, footer.loading, initialized.footer]);
 
   // ── Permission checks ───────────────────────────────────
   const canEdit = (page: SitePageId) => {

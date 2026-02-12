@@ -27,10 +27,6 @@ service cloud.firestore {
       return isModerator() && request.auth.token.permissions[perm] == true;
     }
 
-    function canManageContent() {
-      return isAdmin() || hasModPermission('canManageCourses') || hasModPermission('canManageQuestions');
-    }
-
     // ─── Users ────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isAuthenticated();
