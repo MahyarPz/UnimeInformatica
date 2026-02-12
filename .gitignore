@@ -36,6 +36,7 @@ next-env.d.ts
 firebase/functions/node_modules/
 firebase/functions/lib/
 firebase-debug.log
+service-account.json
 
 # IDE
 .idea/
