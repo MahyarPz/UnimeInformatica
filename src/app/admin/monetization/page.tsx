@@ -657,7 +657,7 @@ export default function AdminMonetizationPage() {
 }
 
 // ─── Plan Details Drawer (with AI overrides + History) ────
-function PlanDetailsDrawer({ uid, onClose, addToast }: { uid: string | null; onClose: () => void; addToast: (t: { title: string; variant?: string }) => void }) {
+function PlanDetailsDrawer({ uid, onClose, addToast }: { uid: string | null; onClose: () => void; addToast: (t: { title: string; variant?: 'default' | 'destructive' | 'success' }) => void }) {
   const { plan, loading: planLoading } = useUserPlanDoc(uid);
   const { history, loading: historyLoading } = usePlanHistory(uid);
 
