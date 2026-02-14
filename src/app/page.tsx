@@ -201,9 +201,14 @@ function FeaturedCoursesBlock({ content, courses }: { content: any; courses: Cou
             >
               <Link href={`/courses/${course.slug}`}>
                 <Card className="h-full group cursor-pointer hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1 bg-card/90 backdrop-blur-sm">
-                  <CardHeader>
+                  {course.imageUrl && (
+                    <div className="aspect-[16/9] overflow-hidden rounded-t-xl">
+                      <img src={course.imageUrl} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    </div>
+                  )}
+                  <CardHeader className={course.imageUrl ? 'pt-4' : ''}>
                     <div className="flex items-center gap-2 text-primary mb-2">
-                      <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
+                      <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/15 group-hover:scale-110 transition-all duration-300">
                         <BookOpen className="h-4 w-4" />
                       </div>
                     </div>
@@ -246,8 +251,8 @@ function StatsBlock({ content }: { content: any }) {
               transition={{ delay: i * 0.1 }}
               className="space-y-1"
             >
-              <div className="text-4xl md:text-5xl font-extrabold bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">{item.value}</div>
-              <div className="text-sm text-muted-foreground">{item.label}</div>
+              <div className="text-2xl sm:text-3xl md:text-4xl font-extrabold bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent leading-tight truncate">{item.value}</div>
+              <div className="text-sm text-muted-foreground mt-1">{item.label}</div>
             </motion.div>
           ))}
         </div>
