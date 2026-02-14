@@ -268,7 +268,7 @@ function StatsBlock({ content }: { content: any }) {
             {content.heading}
           </motion.h2>
         )}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10 max-w-5xl mx-auto">
           {(content.items || []).map((item: any, i: number) => (
             <motion.div
               key={i}
@@ -276,10 +276,10 @@ function StatsBlock({ content }: { content: any }) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="space-y-1"
+              className="space-y-2 p-5 rounded-2xl bg-muted/40 border border-border/30"
             >
-              <div className="text-2xl sm:text-3xl md:text-4xl font-extrabold bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent leading-tight truncate">{item.value}</div>
-              <div className="text-sm text-muted-foreground mt-1">{item.label}</div>
+              <div className="text-xl sm:text-2xl md:text-3xl font-extrabold bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent leading-tight break-words">{item.value}</div>
+              <div className="text-sm text-muted-foreground">{item.label}</div>
             </motion.div>
           ))}
         </div>
