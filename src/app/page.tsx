@@ -53,13 +53,13 @@ const staggerContainer = {
 
 function HeroBlock({ content }: { content: any }) {
   return (
-    <section className="relative overflow-hidden py-24 md:py-36 lg:py-44">
+    <section className="relative overflow-hidden py-24 md:py-36 lg:py-44 bg-gradient-to-b from-primary/[0.03] via-background to-background">
       {/* Background: dot grid + glow blobs */}
       <div className="absolute inset-0 dot-grid" />
       <div className="absolute inset-0 noise-overlay" />
-      <div className="glow-blob animate-glow-shift w-[500px] h-[500px] bg-primary/30 top-[-10%] left-[10%]" />
-      <div className="glow-blob animate-glow-shift w-[400px] h-[400px] bg-blue-500/20 bottom-[-5%] right-[5%]" style={{ animationDelay: '3s' }} />
-      <div className="glow-blob animate-glow-shift w-[300px] h-[300px] bg-violet-500/15 top-[20%] right-[25%]" style={{ animationDelay: '5s' }} />
+      <div className="glow-blob animate-glow-shift w-[600px] h-[600px] bg-blue-500/40 -top-[15%] -left-[5%]" />
+      <div className="glow-blob animate-glow-shift w-[500px] h-[500px] bg-violet-500/30 -bottom-[10%] -right-[5%]" style={{ animationDelay: '3s' }} />
+      <div className="glow-blob animate-glow-shift w-[400px] h-[400px] bg-indigo-400/25 top-[10%] right-[15%]" style={{ animationDelay: '5s' }} />
 
       <div className="container relative z-10">
         <motion.div
@@ -70,7 +70,7 @@ function HeroBlock({ content }: { content: any }) {
         >
           {/* Badge chip */}
           <motion.div variants={fadeUp}>
-            <span className="inline-flex items-center gap-2 border border-primary/20 bg-primary/5 text-primary px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm">
+            <span className="inline-flex items-center gap-2 border border-primary/30 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm shadow-sm">
               <GraduationCap className="h-4 w-4" />
               Course-First Learning Platform
             </span>
@@ -79,7 +79,7 @@ function HeroBlock({ content }: { content: any }) {
           {/* Title */}
           <motion.h1
             variants={fadeUp}
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]"
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.08] bg-gradient-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent"
           >
             {content.title}
           </motion.h1>
@@ -111,8 +111,12 @@ function HeroBlock({ content }: { content: any }) {
           </motion.div>
 
           {/* Trust bar */}
-          <motion.div variants={fadeUp} className="pt-6">
-            <p className="text-xs text-muted-foreground/60 uppercase tracking-widest">Built for students, by students</p>
+          <motion.div variants={fadeUp} className="pt-8">
+            <div className="flex items-center justify-center gap-6 text-muted-foreground/50">
+              <div className="h-px w-12 bg-border" />
+              <p className="text-xs uppercase tracking-[0.2em] font-medium">Built for students, by students</p>
+              <div className="h-px w-12 bg-border" />
+            </div>
           </motion.div>
         </motion.div>
       </div>
@@ -145,9 +149,9 @@ function FeaturesBlock({ content }: { content: any }) {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.08, duration: 0.5 }}
               >
-                <Card className="h-full group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
+                <Card className="h-full group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 bg-card/80 backdrop-blur-sm">
                   <CardHeader>
-                    <div className="inline-flex p-2.5 rounded-xl w-fit bg-primary/8 text-primary mb-2 group-hover:bg-primary/12 transition-colors">
+                    <div className="inline-flex p-2.5 rounded-xl w-fit bg-primary/10 text-primary mb-2 group-hover:bg-primary/15 group-hover:scale-110 transition-all duration-300">
                       <Icon className="h-5 w-5" />
                     </div>
                     <CardTitle className="text-lg">{item.title}</CardTitle>
@@ -174,8 +178,9 @@ function FeaturedCoursesBlock({ content, courses }: { content: any; courses: Cou
   if (display.length === 0) return null;
 
   return (
-    <section className="py-20 md:py-28 bg-muted/30 border-t border-border/30">
-      <div className="container">
+    <section className="relative py-20 md:py-28 bg-muted/40 border-t border-border/30 overflow-hidden">
+      <div className="absolute inset-0 dot-grid opacity-50" />
+      <div className="container relative z-10">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
           <div>
             <h2 className="text-3xl md:text-4xl font-bold">{content.heading || 'Available Courses'}</h2>
@@ -195,10 +200,10 @@ function FeaturedCoursesBlock({ content, courses }: { content: any; courses: Cou
               transition={{ delay: i * 0.08, duration: 0.5 }}
             >
               <Link href={`/courses/${course.slug}`}>
-                <Card className="h-full group cursor-pointer hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-0.5">
+                <Card className="h-full group cursor-pointer hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1 bg-card/90 backdrop-blur-sm">
                   <CardHeader>
                     <div className="flex items-center gap-2 text-primary mb-2">
-                      <div className="p-1.5 rounded-lg bg-primary/8">
+                      <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
                         <BookOpen className="h-4 w-4" />
                       </div>
                     </div>
@@ -241,7 +246,7 @@ function StatsBlock({ content }: { content: any }) {
               transition={{ delay: i * 0.1 }}
               className="space-y-1"
             >
-              <div className="text-3xl md:text-4xl font-bold bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">{item.value}</div>
+              <div className="text-4xl md:text-5xl font-extrabold bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">{item.value}</div>
               <div className="text-sm text-muted-foreground">{item.label}</div>
             </motion.div>
           ))}
@@ -279,8 +284,11 @@ function FAQBlock({ content }: { content: any }) {
 
 function CTABlock({ content }: { content: any }) {
   return (
-    <section className="py-20 md:py-28 border-t border-border/30">
-      <div className="container max-w-2xl text-center space-y-6">
+    <section className="relative py-20 md:py-28 border-t border-border/30 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/[0.04] via-violet-500/[0.03] to-primary/[0.04]" />
+      <div className="glow-blob w-[400px] h-[400px] bg-primary/25 top-[10%] left-[20%]" />
+      <div className="glow-blob w-[300px] h-[300px] bg-violet-500/20 bottom-[10%] right-[20%]" style={{ animationDelay: '2s' }} />
+      <div className="container max-w-2xl text-center space-y-6 relative z-10">
         <h2 className="text-3xl md:text-4xl font-bold">{content.heading}</h2>
         {content.bodyMarkdown && (
           <div
@@ -302,8 +310,9 @@ function CTABlock({ content }: { content: any }) {
 
 function HowItWorksBlock({ content }: { content: any }) {
   return (
-    <section className="py-20 md:py-28 bg-muted/30 border-t border-border/30">
-      <div className="container">
+    <section className="relative py-20 md:py-28 bg-muted/40 border-t border-border/30 overflow-hidden">
+      <div className="absolute inset-0 dot-grid opacity-40" />
+      <div className="container relative z-10">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">{content.heading}</h2>
         <div className="w-12 h-1 rounded-full bg-primary mx-auto mb-16" />
         <div className="grid md:grid-cols-3 gap-12">
@@ -316,7 +325,7 @@ function HowItWorksBlock({ content }: { content: any }) {
               transition={{ delay: i * 0.15 }}
               className="text-center space-y-4"
             >
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-lg shadow-lg shadow-primary/20">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-primary-foreground font-bold text-lg shadow-lg shadow-primary/25 ring-4 ring-primary/10">
                 {i + 1}
               </div>
               <h3 className="text-xl font-semibold">{step.title}</h3>
@@ -337,7 +346,7 @@ function TestimonialsBlock({ content }: { content: any }) {
         <div className="w-12 h-1 rounded-full bg-primary mx-auto mb-12" />
         <div className="grid md:grid-cols-3 gap-5">
           {(content.items || []).map((item: any, i: number) => (
-            <Card key={i} className="h-full hover:border-primary/20 transition-colors">
+            <Card key={i} className="h-full hover:border-primary/20 hover:shadow-md transition-all duration-300 bg-card/80 backdrop-blur-sm">
               <CardContent className="pt-6">
                 <p className="text-muted-foreground italic mb-4 text-sm leading-relaxed">&ldquo;{item.text}&rdquo;</p>
                 <div className="flex items-center gap-3 pt-4 border-t border-border/50">
