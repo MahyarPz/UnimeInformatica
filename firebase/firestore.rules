@@ -265,5 +265,23 @@ service cloud.firestore {
     match /diagnostics_test/{docId} {
       allow read, write: if isAdmin();
     }
+
+    // ─── Analytics Daily Aggregates ───────────────────────
+    // Only admins/mods with permission can read; only Cloud Functions write
+    match /analytics_daily/{dateId} {
+      allow read: if isAdmin() || hasModPermission('canViewAnalytics');
+      allow write: if false; // Cloud Functions / Admin SDK only
+    }
+
+    // ─── Analytics Courses Daily ──────────────────────────
+    match /analytics_courses_daily/{dateId} {
+      allow read: if isAdmin() || hasModPermission('canViewAnalytics');
+      allow write: if false;
+
+      match /courses/{courseId} {
+        allow read: if isAdmin() || hasModPermission('canViewAnalytics');
+        allow write: if false;
+      }
+    }
   }
 }

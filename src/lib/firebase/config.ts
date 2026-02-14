@@ -3,6 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
+// @ts-ignore — Firebase 10.x bundler moduleResolution doesn't expose getFunctions types correctly
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const firebaseConfig = {

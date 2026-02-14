@@ -501,6 +501,49 @@ export interface DailySummary {
 }
 
 // ============================================================
+// ANALYTICS AGGREGATES (analytics_daily/{YYYY-MM-DD})
+// ============================================================
+export interface AnalyticsDaily {
+  date: string; // YYYY-MM-DD
+  dau: number;
+  wau: number;
+  signups: number;
+  practiceSessionsStarted: number;
+  questionsAnswered: number;
+  aiRequests: number;
+  aiBlocked: number;
+  donationRequestsSubmitted: number;
+  donationRequestsApproved: number;
+  activeSupporter: number;
+  activePro: number;
+  updatedAt: any;
+}
+
+/** analytics_courses_daily/{YYYY-MM-DD}/courses/{courseId} */
+export interface AnalyticsCourseDaily {
+  courseId: string;
+  courseTitle: string;
+  sessions: number;
+  uniqueUsers: number;
+  questionsAnswered: number;
+  correctAnswers: number;
+  updatedAt: any;
+}
+
+/** analytics_top_questions (precomputed by scheduled fn) */
+export interface AnalyticsQuestionStat {
+  questionId: string;
+  courseId: string;
+  courseTitle: string;
+  totalAttempts: number;
+  wrongCount: number;
+  wrongRate: number;
+}
+
+/** Time range for analytics queries */
+export type AnalyticsTimeRange = '7d' | '30d' | '90d' | 'custom';
+
+// ============================================================
 // PRESENCE (RTDB)
 // ============================================================
 export interface PresenceData {

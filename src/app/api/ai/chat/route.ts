@@ -113,6 +113,21 @@ export async function POST(request: NextRequest) {
 
     // Layer 1: Global AI Kill Switch
     if (!monetization?.aiEnabled) {
+      // Log blocked request for analytics
+      adminDb.collection('ai_logs').add({
+        uid,
+        plan: 'unknown',
+        planAtTime: 'free',
+        promptChars: 0,
+        responseChars: 0,
+        status: 'blocked',
+        model: GEMINI_MODEL,
+        latencyMs: Date.now() - requestStartMs,
+        dateKey: getRomeDateKey(),
+        blockReason: 'ai_disabled',
+        timestamp: FieldValue.serverTimestamp(),
+      }).catch(() => {});
+
       return NextResponse.json(
         { error: 'AI features are currently disabled.', code: 'AI_DISABLED' },
         { status: 403 },
@@ -164,6 +179,21 @@ export async function POST(request: NextRequest) {
 
     // Layer 3: Per-user AI ban
     if (aiBanned) {
+      // Log blocked request for analytics
+      adminDb.collection('ai_logs').add({
+        uid,
+        plan: userTier,
+        planAtTime: userTier,
+        promptChars: 0,
+        responseChars: 0,
+        status: 'blocked',
+        model: GEMINI_MODEL,
+        latencyMs: Date.now() - requestStartMs,
+        dateKey: getRomeDateKey(),
+        blockReason: 'ai_banned',
+        timestamp: FieldValue.serverTimestamp(),
+      }).catch(() => {});
+
       return NextResponse.json(
         { error: 'Your AI access has been suspended. Contact support.', code: 'AI_BANNED', plan: userTier, remaining: 0 },
         { status: 403 },
@@ -231,6 +261,21 @@ export async function POST(request: NextRequest) {
       });
     } catch (txError: any) {
       if (txError.message === 'QUOTA_EXCEEDED') {
+        // Log blocked request for analytics
+        adminDb.collection('ai_logs').add({
+          uid,
+          plan: userTier,
+          planAtTime: userTier,
+          promptChars: message.length,
+          responseChars: 0,
+          status: 'blocked',
+          model: GEMINI_MODEL,
+          latencyMs: Date.now() - requestStartMs,
+          dateKey: getRomeDateKey(),
+          blockReason: 'quota_exceeded',
+          timestamp: FieldValue.serverTimestamp(),
+        }).catch(() => {});
+
         return NextResponse.json(
           {
             error: 'Daily AI quota exceeded. Resets at midnight (Europe/Rome).',

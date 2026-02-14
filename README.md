@@ -648,6 +648,43 @@ Admin → Monetization → Users & Plans tab:
 | `ai_usage_daily/{uid}_{YYYYMMDD}` | Daily AI usage counters |
 | `ai_logs/{id}` | Anti-abuse AI request logs (uid, plan, chars, latency) |
 | `donation_requests/{id}` | User donation requests |
+| `analytics_daily/{YYYY-MM-DD}` | Aggregated daily platform metrics (DAU, signups, sessions, AI, monetization) |
+| `analytics_courses_daily/{YYYY-MM-DD}/courses/{courseId}` | Per-course daily engagement (sessions, questions, correct answers) |
+
+---
+
+## Analytics
+
+### Overview
+
+The admin analytics dashboard (Admin Panel → Analytics) provides platform-wide usage trends, monetization insights, and AI usage data with time-range filtering and CSV export.
+
+### Data Sources
+
+Analytics data is collected via **Cloud Functions triggers** that increment atomic counters on `analytics_daily/{YYYY-MM-DD}` documents. This avoids expensive collection scans on page load.
+
+| Event | Trigger | Counter Incremented |
+| ----- | ------- | ------------------- |
+| User signup | `onUserCreated` (Auth trigger) | `signups` |
+| Practice session started | `onSessionCreated` (Firestore `sessions` onCreate) | `practiceSessionsStarted` |
+| Question answered | `onAttemptCreated` (Firestore `attempts` onCreate) | `questionsAnswered` |
+| AI request | `onAILogCreated` (Firestore `ai_logs` onCreate) | `aiRequests`, `aiBlocked` |
+| Donation submitted | `onDonationRequestCreated` | `donationRequestsSubmitted` |
+| Donation approved | `onDonationRequestUpdated` | `donationRequestsApproved` |
+| Plan changed | `onPlanDocUpdated` (Firestore `user_plans` onWrite) | `activeSupporter`, `activePro` |
+
+### Scheduled Job
+
+`dailyAnalyticsReconciliation` runs daily at 00:30 Europe/Rome:
+- Recomputes `activeSupporter` and `activePro` from `user_plans` collection (single scan)
+- Computes `dau` and `wau` from RTDB presence entries (best-effort, cost-free)
+- Ensures the daily doc exists with correct paid user counts
+
+### Security
+
+- `analytics_daily` and `analytics_courses_daily` are **read-only for admins** and moderators with `canViewAnalytics` permission
+- **No client writes** — only Cloud Functions (Admin SDK) write these documents
+- All analytics data is behind the admin layout auth guard
 
 ### Storage Rules
 

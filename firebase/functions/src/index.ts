@@ -484,4 +484,252 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
     metadata: {},
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  // ── Analytics: increment signups ──
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const analyticsRef = db.doc(`analytics_daily/${today}`);
+  await analyticsRef.set(
+    {
+      date: today,
+      signups: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
 });
+
+// ─── Analytics: On Session Created ──────────────────────────
+// When a practice session document is created, increment counter
+export const onSessionCreated = functions.firestore
+  .document('sessions/{sessionId}')
+  .onCreate(async (snap) => {
+    const data = snap.data();
+    const today = new Date().toISOString().split('T')[0];
+    const analyticsRef = db.doc(`analytics_daily/${today}`);
+    await analyticsRef.set(
+      {
+        date: today,
+        practiceSessionsStarted: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // Per-course tracking
+    if (data.courseId) {
+      const courseRef = db.doc(`analytics_courses_daily/${today}/courses/${data.courseId}`);
+      await courseRef.set(
+        {
+          courseId: data.courseId,
+          courseTitle: data.courseTitle || data.courseId,
+          sessions: admin.firestore.FieldValue.increment(1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // Track unique users via a subcollection (lightweight)
+      if (data.userId) {
+        const userTrack = db.doc(`analytics_courses_daily/${today}/courses/${data.courseId}/users/${data.userId}`);
+        await userTrack.set({ uid: data.userId, t: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      }
+    }
+  });
+
+// ─── Analytics: On Attempt Created (question answered) ──────
+export const onAttemptCreated = functions.firestore
+  .document('attempts/{attemptId}')
+  .onCreate(async (snap) => {
+    const data = snap.data();
+    const today = new Date().toISOString().split('T')[0];
+    const analyticsRef = db.doc(`analytics_daily/${today}`);
+    await analyticsRef.set(
+      {
+        date: today,
+        questionsAnswered: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // Per-course question tracking
+    if (data.courseId) {
+      const isCorrect = data.isCorrect === true;
+      const courseRef = db.doc(`analytics_courses_daily/${today}/courses/${data.courseId}`);
+      await courseRef.set(
+        {
+          courseId: data.courseId,
+          questionsAnswered: admin.firestore.FieldValue.increment(1),
+          correctAnswers: admin.firestore.FieldValue.increment(isCorrect ? 1 : 0),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  });
+
+// ─── Analytics: On Donation Request Created ─────────────────
+export const onDonationRequestCreated = functions.firestore
+  .document('donation_requests/{requestId}')
+  .onCreate(async () => {
+    const today = new Date().toISOString().split('T')[0];
+    await db.doc(`analytics_daily/${today}`).set(
+      {
+        date: today,
+        donationRequestsSubmitted: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+
+// ─── Analytics: On Donation Request Approved ────────────────
+export const onDonationRequestUpdated = functions.firestore
+  .document('donation_requests/{requestId}')
+  .onUpdate(async (change) => {
+    const before = change.before.data();
+    const after = change.after.data();
+
+    if (before.status !== 'approved' && after.status === 'approved') {
+      const today = new Date().toISOString().split('T')[0];
+      await db.doc(`analytics_daily/${today}`).set(
+        {
+          date: today,
+          donationRequestsApproved: admin.firestore.FieldValue.increment(1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  });
+
+// ─── Analytics: On AI Log Created ───────────────────────────
+// Piggyback on ai_logs writes from the AI endpoint
+export const onAILogCreated = functions.firestore
+  .document('ai_logs/{logId}')
+  .onCreate(async (snap) => {
+    const data = snap.data();
+    const today = new Date().toISOString().split('T')[0];
+    const isBlocked = data.status === 'blocked' || data.status === 'error';
+
+    const updates: Record<string, any> = {
+      date: today,
+      aiRequests: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (isBlocked) {
+      updates.aiBlocked = admin.firestore.FieldValue.increment(1);
+    }
+
+    await db.doc(`analytics_daily/${today}`).set(updates, { merge: true });
+  });
+
+// ─── Analytics: On Plan Change → update paid user counts ────
+export const onPlanDocUpdated = functions.firestore
+  .document('user_plans/{uid}')
+  .onWrite(async (change) => {
+    const beforeData = change.before.exists ? change.before.data() : null;
+    const afterData = change.after.exists ? change.after.data() : null;
+
+    const beforePlan = beforeData?.plan || 'free';
+    const beforeStatus = beforeData?.status || 'active';
+    const afterPlan = afterData?.plan || 'free';
+    const afterStatus = afterData?.status || 'active';
+
+    // Only act if plan or status changed
+    if (beforePlan === afterPlan && beforeStatus === afterStatus) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const ref = db.doc(`analytics_daily/${today}`);
+    const updates: Record<string, any> = {
+      date: today,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    // Decrement old active plan count
+    if (beforeStatus === 'active' && beforePlan === 'supporter') {
+      updates.activeSupporter = admin.firestore.FieldValue.increment(-1);
+    } else if (beforeStatus === 'active' && beforePlan === 'pro') {
+      updates.activePro = admin.firestore.FieldValue.increment(-1);
+    }
+
+    // Increment new active plan count
+    if (afterStatus === 'active' && afterPlan === 'supporter') {
+      updates.activeSupporter = admin.firestore.FieldValue.increment(1);
+    } else if (afterStatus === 'active' && afterPlan === 'pro') {
+      updates.activePro = admin.firestore.FieldValue.increment(1);
+    }
+
+    await ref.set(updates, { merge: true });
+  });
+
+// ─── Scheduled: Daily Analytics Reconciliation ──────────────
+// Runs daily at 00:30 Europe/Rome — reconciles paid counts & DAU
+export const dailyAnalyticsReconciliation = functions.pubsub
+  .schedule('30 0 * * *')
+  .timeZone('Europe/Rome')
+  .onRun(async () => {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const ref = db.doc(`analytics_daily/${today}`);
+
+    // 1. Recompute activeSupporter / activePro from user_plans
+    const supporterSnap = await db.collection('user_plans')
+      .where('plan', '==', 'supporter')
+      .where('status', '==', 'active')
+      .get();
+    const proSnap = await db.collection('user_plans')
+      .where('plan', '==', 'pro')
+      .where('status', '==', 'active')
+      .get();
+
+    // 2. Compute DAU from RTDB presence (online in last 24h)
+    let dau = 0;
+    try {
+      const rtdb = admin.database();
+      const presenceSnap = await rtdb.ref('presence').once('value');
+      if (presenceSnap.exists()) {
+        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+        presenceSnap.forEach((child) => {
+          const data = child.val();
+          if (data.lastActive && data.lastActive > cutoff) {
+            dau++;
+          }
+        });
+      }
+    } catch (e) {
+      console.error('DAU computation error:', e);
+    }
+
+    // 3. WAU — users active in last 7 days (sample from presence, best-effort)
+    let wau = 0;
+    try {
+      const rtdb = admin.database();
+      const presenceSnap = await rtdb.ref('presence').once('value');
+      if (presenceSnap.exists()) {
+        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        presenceSnap.forEach((child) => {
+          const data = child.val();
+          if (data.lastActive && data.lastActive > cutoff) {
+            wau++;
+          }
+        });
+      }
+    } catch (e) {
+      console.error('WAU computation error:', e);
+    }
+
+    await ref.set(
+      {
+        date: today,
+        activeSupporter: supporterSnap.size,
+        activePro: proSnap.size,
+        dau,
+        wau,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    console.log(`Analytics reconciliation done for ${today}: Supporters=${supporterSnap.size}, Pro=${proSnap.size}, DAU=${dau}, WAU=${wau}`);
+  });

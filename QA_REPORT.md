@@ -462,3 +462,48 @@ All 16 admin sub-pages were reviewed. Key finding:
 
 - [ ] Profile page shows correct plan badge and expiry
 - [ ] AI chat respects per-user overrides
+
+---
+
+## Section H — Analytics Dashboard
+
+### H1. Verifying Analytics Data Collection
+
+1. **Signup test**: Create a new user account → check `analytics_daily/{today}` doc in Firestore → `signups` should increment by 1.
+2. **Practice session test**: Start a practice session → `practiceSessionsStarted` increments.
+3. **Question answered test**: Answer a question (MCQ or essay) → `questionsAnswered` increments.
+4. **AI request test**: Send a message via AI chat → `aiRequests` increments. If blocked (quota/banned/disabled), `aiBlocked` also increments.
+5. **Donation test**: Submit a donation request → `donationRequestsSubmitted` increments. Admin approves → `donationRequestsApproved` increments.
+6. **Plan change test**: Set a user to Supporter → `activeSupporter` increments. Revoke → decrements.
+
+### H2. Admin Access Verification
+
+- [ ] Non-admin user navigating to `/admin/analytics` → redirected (layout guard)
+- [ ] Moderator without `canViewAnalytics` permission → cannot read `analytics_daily` (Firestore rules deny)
+- [ ] Moderator WITH `canViewAnalytics` → can view analytics page and read data
+- [ ] Direct Firestore read of `analytics_daily` from unauthenticated client → denied
+- [ ] Client-side write to `analytics_daily` → denied (only Cloud Functions/Admin SDK can write)
+
+### H3. Data Integrity
+
+- [ ] `analytics_daily` docs are write-protected: client `setDoc`/`updateDoc` fails
+- [ ] `analytics_courses_daily` docs are write-protected
+- [ ] Scheduled function `dailyAnalyticsReconciliation` recomputes `activeSupporter`/`activePro` from `user_plans` daily
+- [ ] DAU/WAU are best-effort from RTDB presence (not 100% accurate but cost-free)
+
+### H4. Cost Notes
+
+Analytics uses an **aggregated daily document** pattern:
+- **One Firestore doc per day** (`analytics_daily/{YYYY-MM-DD}`) instead of scanning all users/sessions
+- Counters are incremented atomically via Cloud Functions triggers at event time
+- Dashboard reads only the daily docs for the selected range (7/30/90 days = 7/30/90 reads)
+- Per-course data uses `analytics_courses_daily/{date}/courses/{courseId}` subcollections
+- The daily scheduled function (`dailyAnalyticsReconciliation`) does ONE scan of `user_plans` (typically small collection) to reconcile paid user counts
+- No heavy collection scans on page load
+
+### H5. Export Tests
+
+- [ ] "Daily Metrics CSV" downloads a valid CSV with date rows
+- [ ] "Top Courses CSV" downloads course engagement data
+- [ ] "Top Users CSV" downloads user activity data (admin-only)
+- [ ] CSV exports only contain data from the currently selected time range
