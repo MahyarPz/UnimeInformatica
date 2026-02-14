@@ -494,6 +494,7 @@ All 16 admin sub-pages were reviewed. Key finding:
 ### H4. Cost Notes
 
 Analytics uses an **aggregated daily document** pattern:
+
 - **One Firestore doc per day** (`analytics_daily/{YYYY-MM-DD}`) instead of scanning all users/sessions
 - Counters are incremented atomically via Cloud Functions triggers at event time
 - Dashboard reads only the daily docs for the selected range (7/30/90 days = 7/30/90 reads)
@@ -515,12 +516,14 @@ Analytics uses an **aggregated daily document** pattern:
 ### I1. Overview
 
 A comprehensive session management system was added to handle:
+
 - Firebase Auth session expiry (token refresh failures, sign-out)
 - Access revocation (role changes, plan downgrades)
 - Firestore permission-denied errors
 - API 401/403 responses
 
 **Key files:**
+
 - `src/lib/utils/session.ts` — Central session invalidation logic, event dispatch, Firebase error classification
 - `src/lib/utils/api.ts` — Standardized fetch wrapper with auto 401/403 handling
 - `src/lib/utils/drafts.ts` — Draft persistence for practice sessions
@@ -531,6 +534,7 @@ A comprehensive session management system was added to handle:
 ### I2. QA Scenarios
 
 #### Scenario 1: Expired Session
+
 - [ ] Force logout (clear Firebase Auth) while on a protected page (e.g., `/dashboard`)
 - [ ] **Expected:** SessionExpiredDialog appears with "Session Expired" message
 - [ ] **Expected:** Clicking "Log In" redirects to `/login?reason=session_expired&next=%2Fdashboard`
@@ -538,6 +542,7 @@ A comprehensive session management system was added to handle:
 - [ ] **Expected:** After successful login, user is redirected back to `/dashboard`
 
 #### Scenario 2: Admin Access Revoked
+
 - [ ] Open `/admin` as an admin user
 - [ ] Revoke admin role in Firestore `users/{uid}.role` → `'user'` and update custom claims
 - [ ] **Expected:** Within seconds (on next `onIdTokenChanged` fire), SessionExpiredDialog appears with "Access Changed"
@@ -545,17 +550,20 @@ A comprehensive session management system was added to handle:
 - [ ] **Expected:** User is redirected to `/login?reason=access_changed`
 
 #### Scenario 3: Plan Revoked Mid-AI Usage
+
 - [ ] User on `/ai` with supporter/pro plan; admin revokes plan via admin panel
 - [ ] User sends next AI message
 - [ ] **Expected:** API returns 403; `apiFetch` intercepts and shows "Access Changed" dialog
 - [ ] **Expected:** User is redirected to login
 
 #### Scenario 4: Firestore Permission Denied
+
 - [ ] Simulate reading an admin-only collection (`audit_log`) as a regular user
 - [ ] **Expected:** Firestore returns `permission-denied`
 - [ ] **Expected:** `handleFirebaseError` dispatches `access_changed` event → SessionExpiredDialog appears
 
 #### Scenario 5: Draft Restore (Practice Session)
+
 - [ ] Start a practice session, answer 2-3 questions
 - [ ] Session expires (token becomes invalid)
 - [ ] **Expected:** Draft is saved to localStorage (`unime_draft_practice_{uid}_{courseId}`)
@@ -563,17 +571,20 @@ A comprehensive session management system was added to handle:
 - [ ] **Expected:** Draft data is available (current index, answers)
 
 #### Scenario 6: API Retry on Network Error
+
 - [ ] Simulate transient network failure on `/api/ai/chat`
 - [ ] **Expected:** `apiFetch` retries up to 2 times with exponential backoff
 - [ ] **Expected:** If all retries fail, error is shown (not session expired)
 
 #### Scenario 7: No Infinite Redirect Loops
+
 - [ ] Navigate directly to `/login?reason=session_expired` while unauthenticated
 - [ ] **Expected:** Login page renders normally with banner, no redirect loop
 - [ ] Navigate to `/signup` while unauthenticated
 - [ ] **Expected:** Signup page renders normally, no session expired dialog
 
 #### Scenario 8: Client Event Audit Logging
+
 - [ ] Trigger a session expired event
 - [ ] **Expected:** A document is created in `client_events` collection with `uid`, `type`, `route`, `createdAt`
 - [ ] **Expected:** Only admins can read `client_events` (Firestore rules enforced)
