@@ -11,6 +11,10 @@
         "currentPath": { ".validate": "newData.isString()" }
       }
     },
+    "status": {
+      ".read": "auth != null",
+      ".write": false
+    },
     "typing": {
       "$roomId": {
         "$uid": {
