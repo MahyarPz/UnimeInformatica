@@ -6,6 +6,18 @@ admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
 
+// ─── Helper: get date string in Europe/Rome timezone ───────
+function getRomeDateKey(date?: Date): string {
+  const d = date || new Date();
+  return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+}
+
+function getYesterdayRomeDateKey(): string {
+  const d = new Date();
+  d.setTime(d.getTime() - 24 * 60 * 60 * 1000);
+  return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+}
+
 // ─── Helper: verify caller is admin ────────────────────────
 async function verifyAdmin(context: functions.https.CallableContext): Promise<string> {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not authenticated');
@@ -401,9 +413,9 @@ export const onQuestionCreated = functions.firestore
   });
 
 // ─── On Practice Session Completed ──────────────────────────
-// Update user stats when a practice session is marked complete
+// Update user stats + analytics when a session is marked complete
 export const onSessionCompleted = functions.firestore
-  .document('sessions/{sessionId}')
+  .document('exam_sessions/{sessionId}')
   .onUpdate(async (change, context) => {
     const before = change.before.data();
     const after = change.after.data();
@@ -411,10 +423,15 @@ export const onSessionCompleted = functions.firestore
     if (before.status !== 'completed' && after.status === 'completed') {
       const uid = after.userId;
       const userStatsRef = db.collection('user_stats').doc(uid);
+      const today = getRomeDateKey();
 
-      const totalQuestions = after.totalQuestions || 0;
-      const correctAnswers = after.correctAnswers || 0;
+      // Count answers from the inline answers map
+      const answersMap = after.answers || {};
+      const answerEntries = Object.values(answersMap) as Array<{ isCorrect?: boolean }>;
+      const totalQuestions = answerEntries.length;
+      const correctAnswers = answerEntries.filter((a) => a.isCorrect === true).length;
 
+      // Update user stats
       await userStatsRef.set(
         {
           totalSessions: admin.firestore.FieldValue.increment(1),
@@ -426,7 +443,6 @@ export const onSessionCompleted = functions.firestore
       );
 
       // Update daily summary
-      const today = new Date().toISOString().split('T')[0];
       const dailyRef = db.collection('daily_summaries').doc(`${uid}_${today}`);
       await dailyRef.set(
         {
@@ -439,11 +455,36 @@ export const onSessionCompleted = functions.firestore
         },
         { merge: true }
       );
+
+      // ── Analytics: increment questionsAnswered ──
+      await db.doc(`analytics_daily/${today}`).set(
+        {
+          date: today,
+          questionsAnswered: admin.firestore.FieldValue.increment(totalQuestions),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // ── Per-course question tracking ──
+      const courseId = after.courseId;
+      if (courseId) {
+        await db.doc(`analytics_courses_daily/${today}/courses/${courseId}`).set(
+          {
+            courseId,
+            questionsAnswered: admin.firestore.FieldValue.increment(totalQuestions),
+            correctAnswers: admin.firestore.FieldValue.increment(correctAnswers),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
     }
   });
 
 // ─── Cleanup Old Presence Data ──────────────────────────────
-// Runs every hour to clean up stale presence entries
+// Runs every hour to mark stale entries as offline.
+// Entries older than 8 days are removed entirely (WAU needs 7 days of data).
 export const cleanupPresence = functions.pubsub
   .schedule('every 60 minutes')
   .onRun(async (context) => {
@@ -454,19 +495,27 @@ export const cleanupPresence = functions.pubsub
     if (!snapshot.exists()) return;
 
     const now = Date.now();
-    const staleThreshold = 5 * 60 * 1000; // 5 minutes
+    const offlineThreshold = 5 * 60 * 1000; // 5 minutes → mark offline
+    const removeThreshold = 8 * 24 * 60 * 60 * 1000; // 8 days → delete entirely
 
-    const updates: Record<string, null> = {};
+    const updates: Record<string, any> = {};
     snapshot.forEach((child) => {
       const data = child.val();
-      if (data.lastActive && now - data.lastActive > staleThreshold) {
+      if (!data.lastActive) return;
+      const age = now - data.lastActive;
+
+      if (age > removeThreshold) {
+        // Too old for WAU — remove entirely
         updates[child.key!] = null;
+      } else if (age > offlineThreshold && data.state === 'online') {
+        // Mark offline but keep lastActive for DAU/WAU computation
+        updates[`${child.key!}/state`] = 'offline';
       }
     });
 
     if (Object.keys(updates).length > 0) {
       await presenceRef.update(updates);
-      console.log(`Cleaned up ${Object.keys(updates).length} stale presence entries`);
+      console.log(`Presence cleanup: ${Object.keys(updates).length} updates applied`);
     }
   });
 
@@ -486,7 +535,7 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
   });
 
   // ── Analytics: increment signups ──
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const today = getRomeDateKey();
   const analyticsRef = db.doc(`analytics_daily/${today}`);
   await analyticsRef.set(
     {
@@ -501,10 +550,10 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
 // ─── Analytics: On Session Created ──────────────────────────
 // When a practice session document is created, increment counter
 export const onSessionCreated = functions.firestore
-  .document('sessions/{sessionId}')
+  .document('exam_sessions/{sessionId}')
   .onCreate(async (snap) => {
     const data = snap.data();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getRomeDateKey();
     const analyticsRef = db.doc(`analytics_daily/${today}`);
     await analyticsRef.set(
       {
@@ -518,61 +567,37 @@ export const onSessionCreated = functions.firestore
     // Per-course tracking
     if (data.courseId) {
       const courseRef = db.doc(`analytics_courses_daily/${today}/courses/${data.courseId}`);
-      await courseRef.set(
-        {
-          courseId: data.courseId,
-          courseTitle: data.courseTitle || data.courseId,
-          sessions: admin.firestore.FieldValue.increment(1),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
 
-      // Track unique users via a subcollection (lightweight)
+      // Track unique users: check if user already tracked today
+      const courseUpdates: Record<string, any> = {
+        courseId: data.courseId,
+        courseTitle: data.courseTitle || data.courseId,
+        sessions: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
       if (data.userId) {
         const userTrack = db.doc(`analytics_courses_daily/${today}/courses/${data.courseId}/users/${data.userId}`);
-        await userTrack.set({ uid: data.userId, t: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        const userSnap = await userTrack.get();
+        if (!userSnap.exists) {
+          // First session for this user+course today — increment uniqueUsers
+          courseUpdates.uniqueUsers = admin.firestore.FieldValue.increment(1);
+          await userTrack.set({ uid: data.userId, t: admin.firestore.FieldValue.serverTimestamp() });
+        }
       }
+
+      await courseRef.set(courseUpdates, { merge: true });
     }
   });
 
-// ─── Analytics: On Attempt Created (question answered) ──────
-export const onAttemptCreated = functions.firestore
-  .document('attempts/{attemptId}')
-  .onCreate(async (snap) => {
-    const data = snap.data();
-    const today = new Date().toISOString().split('T')[0];
-    const analyticsRef = db.doc(`analytics_daily/${today}`);
-    await analyticsRef.set(
-      {
-        date: today,
-        questionsAnswered: admin.firestore.FieldValue.increment(1),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    // Per-course question tracking
-    if (data.courseId) {
-      const isCorrect = data.isCorrect === true;
-      const courseRef = db.doc(`analytics_courses_daily/${today}/courses/${data.courseId}`);
-      await courseRef.set(
-        {
-          courseId: data.courseId,
-          questionsAnswered: admin.firestore.FieldValue.increment(1),
-          correctAnswers: admin.firestore.FieldValue.increment(isCorrect ? 1 : 0),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
-  });
+// NOTE: onAttemptCreated removed — answers are stored inline in exam_sessions.
+// Question counting is now handled in onSessionCompleted below.
 
 // ─── Analytics: On Donation Request Created ─────────────────
 export const onDonationRequestCreated = functions.firestore
   .document('donation_requests/{requestId}')
   .onCreate(async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getRomeDateKey();
     await db.doc(`analytics_daily/${today}`).set(
       {
         date: today,
@@ -591,7 +616,7 @@ export const onDonationRequestUpdated = functions.firestore
     const after = change.after.data();
 
     if (before.status !== 'approved' && after.status === 'approved') {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getRomeDateKey();
       await db.doc(`analytics_daily/${today}`).set(
         {
           date: today,
@@ -609,7 +634,7 @@ export const onAILogCreated = functions.firestore
   .document('ai_logs/{logId}')
   .onCreate(async (snap) => {
     const data = snap.data();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getRomeDateKey();
     const isBlocked = data.status === 'blocked' || data.status === 'error';
 
     const updates: Record<string, any> = {
@@ -625,6 +650,7 @@ export const onAILogCreated = functions.firestore
   });
 
 // ─── Analytics: On Plan Change → update paid user counts ────
+// Recomputes absolute counts to avoid increment drift on new-day docs
 export const onPlanDocUpdated = functions.firestore
   .document('user_plans/{uid}')
   .onWrite(async (change) => {
@@ -639,97 +665,88 @@ export const onPlanDocUpdated = functions.firestore
     // Only act if plan or status changed
     if (beforePlan === afterPlan && beforeStatus === afterStatus) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    const ref = db.doc(`analytics_daily/${today}`);
-    const updates: Record<string, any> = {
-      date: today,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    const today = getRomeDateKey();
 
-    // Decrement old active plan count
-    if (beforeStatus === 'active' && beforePlan === 'supporter') {
-      updates.activeSupporter = admin.firestore.FieldValue.increment(-1);
-    } else if (beforeStatus === 'active' && beforePlan === 'pro') {
-      updates.activePro = admin.firestore.FieldValue.increment(-1);
-    }
+    // Recompute absolute counts from user_plans collection
+    const [supporterSnap, proSnap] = await Promise.all([
+      db.collection('user_plans').where('plan', '==', 'supporter').where('status', '==', 'active').get(),
+      db.collection('user_plans').where('plan', '==', 'pro').where('status', '==', 'active').get(),
+    ]);
 
-    // Increment new active plan count
-    if (afterStatus === 'active' && afterPlan === 'supporter') {
-      updates.activeSupporter = admin.firestore.FieldValue.increment(1);
-    } else if (afterStatus === 'active' && afterPlan === 'pro') {
-      updates.activePro = admin.firestore.FieldValue.increment(1);
-    }
-
-    await ref.set(updates, { merge: true });
+    await db.doc(`analytics_daily/${today}`).set(
+      {
+        date: today,
+        activeSupporter: supporterSnap.size,
+        activePro: proSnap.size,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
   });
 
 // ─── Scheduled: Daily Analytics Reconciliation ──────────────
-// Runs daily at 00:30 Europe/Rome — reconciles paid counts & DAU
+// Runs daily at 00:30 Europe/Rome — reconciles paid counts & DAU/WAU
+// Writes DAU/WAU to yesterday's doc (the full day that just ended)
+// and sets baseline paid user counts on today's doc
 export const dailyAnalyticsReconciliation = functions.pubsub
   .schedule('30 0 * * *')
   .timeZone('Europe/Rome')
   .onRun(async () => {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const ref = db.doc(`analytics_daily/${today}`);
+    const today = getRomeDateKey();
+    const yesterday = getYesterdayRomeDateKey();
 
     // 1. Recompute activeSupporter / activePro from user_plans
-    const supporterSnap = await db.collection('user_plans')
-      .where('plan', '==', 'supporter')
-      .where('status', '==', 'active')
-      .get();
-    const proSnap = await db.collection('user_plans')
-      .where('plan', '==', 'pro')
-      .where('status', '==', 'active')
-      .get();
+    const [supporterSnap, proSnap] = await Promise.all([
+      db.collection('user_plans').where('plan', '==', 'supporter').where('status', '==', 'active').get(),
+      db.collection('user_plans').where('plan', '==', 'pro').where('status', '==', 'active').get(),
+    ]);
 
-    // 2. Compute DAU from RTDB presence (online in last 24h)
+    // 2. Compute DAU and WAU from RTDB presence (single read)
     let dau = 0;
-    try {
-      const rtdb = admin.database();
-      const presenceSnap = await rtdb.ref('presence').once('value');
-      if (presenceSnap.exists()) {
-        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-        presenceSnap.forEach((child) => {
-          const data = child.val();
-          if (data.lastActive && data.lastActive > cutoff) {
-            dau++;
-          }
-        });
-      }
-    } catch (e) {
-      console.error('DAU computation error:', e);
-    }
-
-    // 3. WAU — users active in last 7 days (sample from presence, best-effort)
     let wau = 0;
     try {
       const rtdb = admin.database();
       const presenceSnap = await rtdb.ref('presence').once('value');
       if (presenceSnap.exists()) {
-        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const cutoff24h = now - 24 * 60 * 60 * 1000;
+        const cutoff7d = now - 7 * 24 * 60 * 60 * 1000;
+
         presenceSnap.forEach((child) => {
           const data = child.val();
-          if (data.lastActive && data.lastActive > cutoff) {
-            wau++;
+          if (data.lastActive) {
+            if (data.lastActive > cutoff24h) dau++;
+            if (data.lastActive > cutoff7d) wau++;
           }
         });
       }
     } catch (e) {
-      console.error('WAU computation error:', e);
+      console.error('DAU/WAU computation error:', e);
     }
 
-    await ref.set(
+    // 3. Write DAU/WAU to yesterday's doc (the full day that ended)
+    await db.doc(`analytics_daily/${yesterday}`).set(
       {
-        date: today,
-        activeSupporter: supporterSnap.size,
-        activePro: proSnap.size,
+        date: yesterday,
         dau,
         wau,
+        activeSupporter: supporterSnap.size,
+        activePro: proSnap.size,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
-    console.log(`Analytics reconciliation done for ${today}: Supporters=${supporterSnap.size}, Pro=${proSnap.size}, DAU=${dau}, WAU=${wau}`);
+    // 4. Set baseline paid user counts on today's new doc
+    await db.doc(`analytics_daily/${today}`).set(
+      {
+        date: today,
+        activeSupporter: supporterSnap.size,
+        activePro: proSnap.size,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    console.log(`Analytics reconciliation for ${yesterday}→${today}: Supporters=${supporterSnap.size}, Pro=${proSnap.size}, DAU=${dau}, WAU=${wau}`);
   });

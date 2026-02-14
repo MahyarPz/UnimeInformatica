@@ -286,6 +286,7 @@ export function useTopCourses(
             const existing = courseAgg.get(d.id);
             if (existing) {
               existing.sessions += raw.sessions || 0;
+              existing.uniqueUsers += raw.uniqueUsers || 0;
               existing.questionsAnswered += raw.questionsAnswered || 0;
               existing.correctAnswers += raw.correctAnswers || 0;
             } else {
@@ -351,25 +352,45 @@ export function useTopUsers() {
           query(collection(db, 'user_stats'), orderBy('totalSessions', 'desc')),
         );
 
-        const rows: TopUserRow[] = [];
-        for (const d of statsSnap.docs.slice(0, 50)) {
-          const stats = d.data();
-          // Fetch user profile for display
-          const userSnap = await getDoc(doc(db, 'users', d.id));
-          const user = userSnap.exists() ? userSnap.data() : null;
+        const topDocs = statsSnap.docs.slice(0, 50);
 
-          rows.push({
-            uid: d.id,
-            username: user?.username || d.id,
-            email: user?.email || '',
-            sessions: stats.totalSessions || 0,
-            aiRequests: 0, // Would need ai_usage_daily aggregation
-            lastActive: user?.lastLoginAt
-              ? (user.lastLoginAt.toDate ? format(user.lastLoginAt.toDate(), 'yyyy-MM-dd HH:mm') : '')
-              : '',
-            plan: user?.plan || 'free',
-          });
-        }
+        // Batch-fetch user profiles and AI usage counts
+        const rows: TopUserRow[] = await Promise.all(
+          topDocs.map(async (d) => {
+            const stats = d.data();
+            const uid = d.id;
+
+            // Fetch user profile and AI usage in parallel
+            const [userSnap, aiUsageSnap] = await Promise.all([
+              getDoc(doc(db, 'users', uid)),
+              getDocs(
+                query(
+                  collection(db, 'ai_usage_daily'),
+                  where('__name__', '>=', `${uid}_`),
+                  where('__name__', '<=', `${uid}_\uf8ff`),
+                ),
+              ),
+            ]);
+
+            const user = userSnap.exists() ? userSnap.data() : null;
+            const totalAI = aiUsageSnap.docs.reduce(
+              (sum, aiDoc) => sum + ((aiDoc.data().count as number) || 0),
+              0,
+            );
+
+            return {
+              uid,
+              username: user?.username || uid,
+              email: user?.email || '',
+              sessions: stats.totalSessions || 0,
+              aiRequests: totalAI,
+              lastActive: user?.lastLoginAt
+                ? (user.lastLoginAt.toDate ? format(user.lastLoginAt.toDate(), 'yyyy-MM-dd HH:mm') : '')
+                : '',
+              plan: user?.plan || 'free',
+            };
+          }),
+        );
 
         setData(rows);
       } catch (err) {

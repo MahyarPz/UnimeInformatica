@@ -26,8 +26,12 @@ export function usePresence() {
           currentPath: pathname || '/',
         });
 
-        // On disconnect, remove node entirely (avoids stale data)
-        onDisconnect(presenceRef).remove();
+        // On disconnect, keep the entry but mark offline with server timestamp
+        // This preserves lastActive for DAU/WAU computation
+        onDisconnect(presenceRef).update({
+          state: 'offline',
+          lastActive: serverTimestamp(),
+        });
       }
     });
 
