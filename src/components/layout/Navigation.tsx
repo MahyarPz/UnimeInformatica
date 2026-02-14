@@ -83,10 +83,10 @@ export function Navigation() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 font-bold text-lg group">
           {logoUrl ? (
-            <img src={logoUrl} alt={appName} className="h-7 w-7 rounded-lg object-contain transition-transform group-hover:scale-110" />
+            <img src={logoUrl} alt={appName || 'Unime Informatica'} className="h-8 sm:h-9 md:h-10 w-auto rounded-lg object-contain transition-transform group-hover:scale-110" />
           ) : (
-            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary text-primary-foreground transition-transform group-hover:scale-110">
-              <GraduationCap className="h-5 w-5" />
+            <div className="flex items-center justify-center h-8 sm:h-9 md:h-10 w-8 sm:w-9 md:w-10 rounded-lg bg-primary text-primary-foreground transition-transform group-hover:scale-110">
+              <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
           )}
           <span className="hidden sm:inline tracking-tight">{appName}</span>
