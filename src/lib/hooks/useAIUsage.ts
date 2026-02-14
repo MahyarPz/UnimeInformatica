@@ -5,6 +5,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { AIUsageDaily } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { handleFirebaseError } from '@/lib/utils/session';
 
 /**
  * Get the Europe/Rome date key (YYYYMMDD) for today.
@@ -48,7 +49,10 @@ export function useAIUsage() {
         }
         setLoading(false);
       },
-      () => setLoading(false),
+      (error) => {
+        if (handleFirebaseError(error)) return;
+        setLoading(false);
+      },
     );
 
     return () => unsub();

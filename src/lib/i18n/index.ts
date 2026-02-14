@@ -157,6 +157,15 @@ const translations = {
     'common.start': 'Start',
     'common.by': 'by',
     'common.contributor': 'a contributor',
+
+    // Session
+    'session.expired.title': 'Session Expired',
+    'session.expired.message': 'Your session has expired. Please log in again.',
+    'session.accessChanged.title': 'Access Changed',
+    'session.accessChanged.message': 'Your access permissions have changed. Please log in again.',
+    'session.login': 'Log In',
+    'session.goHome': 'Go Home',
+    'session.draftRestored': 'Restored your draft from a previous session.',
   },
 } as const;
 

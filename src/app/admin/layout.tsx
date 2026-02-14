@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
+import { useAuthGuard } from '@/lib/hooks/useSessionGuard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -68,15 +69,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const hasAdminAccess = claims?.role === 'admin' || claims?.role === 'moderator' ||
-    userProfile?.role === 'admin' || userProfile?.role === 'moderator';
+  // Use centralized auth guard for admin role enforcement
+  const { authorized } = useAuthGuard({
+    requireAuth: true,
+    requireRole: ['admin', 'moderator'],
+  });
 
-  useEffect(() => {
-    if (!loading && (!user || !hasAdminAccess)) {
-      router.push('/');
-    }
-  }, [user, hasAdminAccess, loading, router]);
+  const hasAdminAccess = authorized;
 
+  // Guard handles redirect via SessionExpiredDialog — no manual redirect needed
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

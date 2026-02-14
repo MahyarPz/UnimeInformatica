@@ -507,3 +507,82 @@ Analytics uses an **aggregated daily document** pattern:
 - [ ] "Top Courses CSV" downloads course engagement data
 - [ ] "Top Users CSV" downloads user activity data (admin-only)
 - [ ] CSV exports only contain data from the currently selected time range
+
+---
+
+## Section I — Session Expired / Access Revoked System
+
+### I1. Overview
+
+A comprehensive session management system was added to handle:
+- Firebase Auth session expiry (token refresh failures, sign-out)
+- Access revocation (role changes, plan downgrades)
+- Firestore permission-denied errors
+- API 401/403 responses
+
+**Key files:**
+- `src/lib/utils/session.ts` — Central session invalidation logic, event dispatch, Firebase error classification
+- `src/lib/utils/api.ts` — Standardized fetch wrapper with auto 401/403 handling
+- `src/lib/utils/drafts.ts` — Draft persistence for practice sessions
+- `src/components/layout/SessionExpiredDialog.tsx` — Global modal for session/access errors
+- `src/lib/hooks/useSessionGuard.ts` — `onIdTokenChanged` listener + route access guard
+- `src/middleware.ts` — Next.js Edge middleware (security headers, best-effort protection)
+
+### I2. QA Scenarios
+
+#### Scenario 1: Expired Session
+- [ ] Force logout (clear Firebase Auth) while on a protected page (e.g., `/dashboard`)
+- [ ] **Expected:** SessionExpiredDialog appears with "Session Expired" message
+- [ ] **Expected:** Clicking "Log In" redirects to `/login?reason=session_expired&next=%2Fdashboard`
+- [ ] **Expected:** Login page shows yellow banner: "Your session has expired. Please log in again."
+- [ ] **Expected:** After successful login, user is redirected back to `/dashboard`
+
+#### Scenario 2: Admin Access Revoked
+- [ ] Open `/admin` as an admin user
+- [ ] Revoke admin role in Firestore `users/{uid}.role` → `'user'` and update custom claims
+- [ ] **Expected:** Within seconds (on next `onIdTokenChanged` fire), SessionExpiredDialog appears with "Access Changed"
+- [ ] **Expected:** Cached admin data is cleared on sign-out
+- [ ] **Expected:** User is redirected to `/login?reason=access_changed`
+
+#### Scenario 3: Plan Revoked Mid-AI Usage
+- [ ] User on `/ai` with supporter/pro plan; admin revokes plan via admin panel
+- [ ] User sends next AI message
+- [ ] **Expected:** API returns 403; `apiFetch` intercepts and shows "Access Changed" dialog
+- [ ] **Expected:** User is redirected to login
+
+#### Scenario 4: Firestore Permission Denied
+- [ ] Simulate reading an admin-only collection (`audit_log`) as a regular user
+- [ ] **Expected:** Firestore returns `permission-denied`
+- [ ] **Expected:** `handleFirebaseError` dispatches `access_changed` event → SessionExpiredDialog appears
+
+#### Scenario 5: Draft Restore (Practice Session)
+- [ ] Start a practice session, answer 2-3 questions
+- [ ] Session expires (token becomes invalid)
+- [ ] **Expected:** Draft is saved to localStorage (`unime_draft_practice_{uid}_{courseId}`)
+- [ ] Login again, start a new session for the same course
+- [ ] **Expected:** Draft data is available (current index, answers)
+
+#### Scenario 6: API Retry on Network Error
+- [ ] Simulate transient network failure on `/api/ai/chat`
+- [ ] **Expected:** `apiFetch` retries up to 2 times with exponential backoff
+- [ ] **Expected:** If all retries fail, error is shown (not session expired)
+
+#### Scenario 7: No Infinite Redirect Loops
+- [ ] Navigate directly to `/login?reason=session_expired` while unauthenticated
+- [ ] **Expected:** Login page renders normally with banner, no redirect loop
+- [ ] Navigate to `/signup` while unauthenticated
+- [ ] **Expected:** Signup page renders normally, no session expired dialog
+
+#### Scenario 8: Client Event Audit Logging
+- [ ] Trigger a session expired event
+- [ ] **Expected:** A document is created in `client_events` collection with `uid`, `type`, `route`, `createdAt`
+- [ ] **Expected:** Only admins can read `client_events` (Firestore rules enforced)
+
+### I3. Architecture Notes
+
+- **Event-driven:** Uses custom DOM events (`session:invalid`) for decoupled communication
+- **Debounced:** Session invalid events are debounced (2s) to prevent cascading triggers
+- **No infinite loops:** Public routes (`/login`, `/signup`, `/verify-email`) are excluded from session checks
+- **Server-enforced:** API routes verify tokens with `adminAuth.verifyIdToken()` — client guards are UX-only
+- **Firestore rules:** All admin collections require `isAdmin()` or `isAdminOrMod()`
+- **Draft TTL:** Practice drafts expire after 30 minutes in localStorage

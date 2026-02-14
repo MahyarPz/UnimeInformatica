@@ -26,6 +26,7 @@ import {
   FlaskConical,
 } from 'lucide-react';
 import { t } from '@/lib/i18n';
+import { handleFirebaseError } from '@/lib/utils/session';
 import { timeAgo } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -68,6 +69,7 @@ export default function AdminDashboardPage() {
         });
       } catch (e) {
         // Collections may not exist yet
+        handleFirebaseError(e);
       }
     };
     loadCounts();

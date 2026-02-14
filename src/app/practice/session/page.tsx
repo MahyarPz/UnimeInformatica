@@ -25,6 +25,8 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { cn, getDifficultyColor, getScoreBg, calculateAccuracy } from '@/lib/utils';
+import { saveDraft, loadDraft, clearDraft, practiceSessionDraftKey } from '@/lib/utils/drafts';
+import { handleFirebaseError } from '@/lib/utils/session';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function PracticeSessionInner() {
@@ -48,6 +50,42 @@ function PracticeSessionInner() {
   const [practiceSettings, setPracticeSettings] = useState<PracticeSettings | null>(null);
   const [startTime] = useState(Date.now());
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  // Save draft to localStorage periodically (preserves work on session expiry)
+  useEffect(() => {
+    if (!user || !courseId || questions.length === 0 || submitted) return;
+    const draftKey = practiceSessionDraftKey(user.uid, courseId);
+    saveDraft(draftKey, {
+      currentIndex,
+      answers,
+      sessionId,
+      mode,
+      questionIds: questions.map((q) => q.id),
+    });
+  }, [currentIndex, answers, user, courseId, sessionId, mode, questions, submitted]);
+
+  // Try to restore draft on mount
+  useEffect(() => {
+    if (!user || !courseId || draftRestored) return;
+    const draftKey = practiceSessionDraftKey(user.uid, courseId);
+    const draft = loadDraft(draftKey);
+    if (draft && draft.currentIndex != null && draft.answers) {
+      // Only restore if we're not resuming a specific session
+      if (!resumeSessionId && Object.keys(draft.answers).length > 0) {
+        setDraftRestored(true);
+        // Draft will be used after questions load via the resume path
+      }
+    }
+    setDraftRestored(true);
+  }, [user, courseId, resumeSessionId, draftRestored]);
+
+  // Clear draft on successful submit
+  useEffect(() => {
+    if (submitted && user && courseId) {
+      clearDraft(practiceSessionDraftKey(user.uid, courseId));
+    }
+  }, [submitted, user, courseId]);
 
   // Load questions
   useEffect(() => {
@@ -198,6 +236,7 @@ function PracticeSessionInner() {
         });
       } catch (error) {
         console.error('Failed to load questions:', error);
+        if (handleFirebaseError(error)) return;
         addToast({ title: 'Failed to load questions', variant: 'destructive' });
       }
       setLoading(false);

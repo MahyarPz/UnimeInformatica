@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
 import { useUserPlan } from '@/lib/hooks/useUserPlan';
 import { useAIUsage } from '@/lib/hooks/useAIUsage';
-import { auth } from '@/lib/firebase/config';
+import { apiFetch } from '@/lib/utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -85,31 +85,26 @@ export default function AIPage() {
     setSending(true);
 
     try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('Not authenticated');
-
-      const res = await fetch('/api/ai/chat', {
+      const res = await apiFetch<{ response?: string; error?: string; code?: string }>('/api/ai/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ message: userMessage }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setError(data.error || 'Something went wrong');
-        if (data.code === 'QUOTA_EXCEEDED') {
-          setError('Daily quota exceeded. Resets at midnight (Europe/Rome).');
+        // 401/403 are handled globally by apiFetch (session expired dialog)
+        // Show other errors locally
+        if (res.status !== 401 && res.status !== 403) {
+          setError(res.data?.error || 'Something went wrong');
+          if (res.data?.code === 'QUOTA_EXCEEDED') {
+            setError('Daily quota exceeded. Resets at midnight (Europe/Rome).');
+          }
         }
         return;
       }
 
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: data.response, timestamp: new Date() },
+        { role: 'assistant', content: res.data.response || '', timestamp: new Date() },
       ]);
     } catch (e: any) {
       setError(e.message || 'Failed to send message');

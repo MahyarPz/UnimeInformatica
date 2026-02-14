@@ -7,6 +7,8 @@ import { AnnouncementBanner } from '@/components/layout/AnnouncementBanner';
 import { PresenceWrapper } from '@/components/layout/PresenceWrapper';
 import { EmailVerificationGuard } from '@/components/layout/EmailVerificationGuard';
 import { MaintenanceGuard } from '@/components/layout/MaintenanceGuard';
+import { SessionExpiredDialog } from '@/components/layout/SessionExpiredDialog';
+import { useSessionGuard } from '@/lib/hooks/useSessionGuard';
 import { SiteSettingsProvider, useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
 import { SiteContentProvider, useSiteContentContext } from '@/contexts/SiteContentContext';
 
@@ -100,13 +102,20 @@ function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function SessionGuardWrapper() {
+  useSessionGuard();
+  return null;
+}
+
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <SiteSettingsProvider>
       <SiteContentProvider>
         <MaintenanceGuard>
           <EmailVerificationGuard>
+            <SessionGuardWrapper />
             <PresenceWrapper />
+            <SessionExpiredDialog />
             <AppShell>{children}</AppShell>
           </EmailVerificationGuard>
         </MaintenanceGuard>

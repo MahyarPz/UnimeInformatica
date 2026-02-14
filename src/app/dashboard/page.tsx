@@ -39,6 +39,7 @@ import { useToast } from '@/components/ui/toast';
 import { useCourses } from '@/lib/hooks/useCourses';
 import { Question, Note, ExamSession } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
+import { handleFirebaseError } from '@/lib/utils/session';
 import { t } from '@/lib/i18n';
 
 export default function DashboardPage() {
@@ -65,7 +66,7 @@ export default function DashboardPage() {
     );
     const unsubSessions = onSnapshot(sessionsQ, (snap) => {
       setSessions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ExamSession)));
-    }, (err) => console.error('exam_sessions query failed:', err));
+    }, (err) => { console.error('exam_sessions query failed:', err); handleFirebaseError(err); });
 
     // Load private questions
     const questionsQ = query(
@@ -75,7 +76,7 @@ export default function DashboardPage() {
     );
     const unsubQuestions = onSnapshot(questionsQ, (snap) => {
       setMyQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Question)));
-    }, (err) => console.error('questions_private query failed:', err));
+    }, (err) => { console.error('questions_private query failed:', err); handleFirebaseError(err); });
 
     // Load private notes
     const notesQ = query(
@@ -86,7 +87,7 @@ export default function DashboardPage() {
     );
     const unsubNotes = onSnapshot(notesQ, (snap) => {
       setMyNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Note)));
-    }, (err) => console.error('notes query failed:', err));
+    }, (err) => { console.error('notes query failed:', err); handleFirebaseError(err); });
 
     return () => { unsubSessions(); unsubQuestions(); unsubNotes(); };
   }, [user]);

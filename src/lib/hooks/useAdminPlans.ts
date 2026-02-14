@@ -10,19 +10,17 @@ import { auth } from '@/lib/firebase/config';
 import {
   UserProfile, UserPlan, PlanHistoryEntry, UserPlanTier, UserPlanStatus, UserPlanSource,
 } from '@/lib/types';
+import { apiFetch } from '@/lib/utils/api';
+import { handleFirebaseError } from '@/lib/utils/session';
 
 // ─── API helper ───────────────────────────────────────────
 async function callPlanApi(body: Record<string, any>) {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Not authenticated');
-  const res = await fetch('/api/admin/plans', {
+  const res = await apiFetch('/api/admin/plans', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
-  return data;
+  if (!res.ok) throw new Error(res.data?.error || 'Request failed');
+  return res.data;
 }
 
 export interface SetUserPlanParams {
@@ -73,7 +71,7 @@ export function useAdminPlans() {
       const list = snap.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile));
       setUsers(list);
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => { handleFirebaseError(err); setLoading(false); });
     return () => unsub();
   }, []);
 

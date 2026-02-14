@@ -5,6 +5,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { UserPlan, UserPlanTier } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { handleFirebaseError } from '@/lib/utils/session';
 
 /**
  * Hook to load the current user's plan from user_plans/{uid}.
@@ -55,7 +56,8 @@ export function useUserPlan() {
         }
         setLoading(false);
       },
-      () => {
+      (error) => {
+        if (handleFirebaseError(error)) return;
         setPlan(null);
         setEffectiveTier('free');
         setLoading(false);

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { SiteSettings, DEFAULT_SITE_SETTINGS } from '@/lib/types';
+import { handleFirebaseError } from '@/lib/utils/session';
 
 // ─── Hex → HSL conversion ───
 function hexToHSL(hex: string): string | null {
@@ -65,7 +66,8 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
         }
         setLoading(false);
       },
-      () => {
+      (error) => {
+        handleFirebaseError(error);
         setLoading(false);
       },
     );

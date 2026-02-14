@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { ActivityEvent } from '@/lib/types';
+import { handleFirebaseError } from '@/lib/utils/session';
 
 export function useActivityFeed(maxEvents: number = 20, categoryFilter?: string) {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
@@ -44,6 +45,7 @@ export function useActivityFeed(maxEvents: number = 20, categoryFilter?: string)
       setLoading(false);
     }, (err) => {
       console.error('activity_events query failed:', err);
+      if (handleFirebaseError(err)) return;
       setLoading(false);
     });
 

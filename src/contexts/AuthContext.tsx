@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import {
   onAuthStateChanged,
+  onIdTokenChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -168,6 +169,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return () => unsubscribe();
   }, [fetchProfile, isBootstrapAdmin]);
+
+  // Listen for ID token changes (role/claims changes from Cloud Functions)
+  // This fires when custom claims are updated, enabling real-time role revocation.
+  useEffect(() => {
+    const unsubToken = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const tokenResult = await firebaseUser.getIdTokenResult();
+          setClaims(tokenResult.claims as any);
+        } catch {
+          // Token refresh failed — handled by session guard
+        }
+      }
+    });
+    return () => unsubToken();
+  }, []);
 
   const checkUsernameAvailable = async (username: string): Promise<boolean> => {
     const lower = username.toLowerCase().trim();

@@ -283,5 +283,11 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+
+    // ─── Client Events (session expired / access revoked audit) ──
+    match /client_events/{eventId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+    }
   }
 }
