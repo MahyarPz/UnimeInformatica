@@ -57,7 +57,7 @@ function StatusBadge({ status, plan }: { status?: string; plan?: string }) {
   if (!plan || plan === 'free') return <span className="text-xs text-muted-foreground">—</span>;
   if (!status || status === 'active') return <Badge className="bg-green-100 text-green-700 text-xs">ACTIVE</Badge>;
   if (status === 'revoked') return <Badge className="bg-red-100 text-red-700 text-xs">REVOKED</Badge>;
-  if (status === 'expired') return <Badge className="bg-gray-100 text-gray-600 text-xs">EXPIRED</Badge>;
+  if (status === 'expired') return <Badge className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs">EXPIRED</Badge>;
   return <Badge variant="outline" className="text-xs">{(status ?? '').toUpperCase()}</Badge>;
 }
 

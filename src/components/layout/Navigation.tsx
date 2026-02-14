@@ -31,6 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { cn, getInitials } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
@@ -77,47 +78,53 @@ export function Navigation() {
   if (pathname?.startsWith('/admin')) return null;
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl">
+        <Link href="/" className="flex items-center gap-2.5 font-bold text-lg group">
           {logoUrl ? (
-            <img src={logoUrl} alt={appName} className="h-7 w-7 rounded object-contain" />
+            <img src={logoUrl} alt={appName} className="h-7 w-7 rounded-lg object-contain transition-transform group-hover:scale-110" />
           ) : (
-            <GraduationCap className="h-7 w-7 text-primary" />
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary text-primary-foreground transition-transform group-hover:scale-110">
+              <GraduationCap className="h-5 w-5" />
+            </div>
           )}
-          <span className="hidden sm:inline">{appName}</span>
-          <span className="sm:hidden">{appName.split(' ')[0]}</span>
+          <span className="hidden sm:inline tracking-tight">{appName}</span>
+          <span className="sm:hidden tracking-tight">{appName.split(' ')[0]}</span>
         </Link>
 
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent',
-                pathname === link.href || pathname?.startsWith(link.href + '/')
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground'
-              )}
-            >
-              <link.icon className="h-4 w-4" />
-              {link.label}
-            </Link>
-          ))}
+        {/* Desktop Nav — centered */}
+        <nav className="hidden md:flex items-center gap-1 rounded-full border border-border/50 bg-muted/50 px-1.5 py-1">
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href || pathname?.startsWith(link.href + '/');
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  'flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
+                  isActive
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <link.icon className="h-4 w-4" />
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Desktop Right */}
         <div className="hidden md:flex items-center gap-2">
+          <ThemeToggle />
           {user && userProfile ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full ring-1 ring-border/50 hover:ring-primary/30 transition-all">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={userProfile.avatar} alt={userProfile.username} />
-                    <AvatarFallback>{getInitials(userProfile.username)}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{getInitials(userProfile.username)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -157,7 +164,7 @@ export function Navigation() {
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" /> {t('nav.logout')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -165,12 +172,12 @@ export function Navigation() {
           ) : (
             <div className="flex items-center gap-2">
               {showLogin && (
-                <Button variant="ghost" asChild size="sm">
+                <Button variant="ghost" asChild size="sm" className="rounded-full">
                   <Link href="/login">{t('nav.login')}</Link>
                 </Button>
               )}
               {showSignup && (
-                <Button asChild size="sm">
+                <Button asChild size="sm" className="rounded-full shadow-sm">
                   <Link href="/signup">{t('nav.signup')}</Link>
                 </Button>
               )}
@@ -178,10 +185,17 @@ export function Navigation() {
           )}
         </div>
 
-        {/* Mobile Menu Button */}
-        <button className="md:hidden p-2" onClick={() => setMobileOpen(!mobileOpen)}>
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+        {/* Mobile Right: theme toggle + menu button */}
+        <div className="md:hidden flex items-center gap-1">
+          <ThemeToggle />
+          <button
+            className="p-2 rounded-lg hover:bg-accent transition-colors"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
@@ -191,55 +205,58 @@ export function Navigation() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t bg-background"
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-xl"
           >
-            <nav className="container py-4 flex flex-col gap-2">
+            <nav className="container py-4 flex flex-col gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors',
-                    pathname === link.href ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent'
+                    'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors',
+                    pathname === link.href ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                   )}
                 >
                   <link.icon className="h-5 w-5" />
                   {link.label}
                 </Link>
               ))}
+              <div className="h-px bg-border/50 my-2" />
               {user && userProfile ? (
                 <>
-                  <Link href="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
+                  <Link href="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
                     <User className="h-5 w-5" /> {t('nav.profile')}
                   </Link>
-                  <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
+                  <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
                     <LayoutDashboard className="h-5 w-5" /> {t('nav.dashboard')}
                   </Link>
-                  <Link href="/ai" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
+                  <Link href="/ai" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
                     <Bot className="h-5 w-5" /> AI Assistant
                   </Link>
-                  <Link href="/support" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
+                  <Link href="/support" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
                     <Heart className="h-5 w-5" /> Support
                   </Link>
                   {(isAdmin || isMod) && (
-                    <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent">
+                    <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
                       <Shield className="h-5 w-5" /> {t('nav.admin')}
                     </Link>
                   )}
-                  <button onClick={() => { logout(); setMobileOpen(false); }} className="flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 w-full text-left">
+                  <div className="h-px bg-border/50 my-2" />
+                  <button onClick={() => { logout(); setMobileOpen(false); }} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 w-full text-left">
                     <LogOut className="h-5 w-5" /> {t('nav.logout')}
                   </button>
                 </>
               ) : (
                 <div className="flex gap-2 px-3 pt-2">
                   {showLogin && (
-                    <Button variant="outline" asChild className="flex-1" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" asChild className="flex-1 rounded-full" onClick={() => setMobileOpen(false)}>
                       <Link href="/login">{t('nav.login')}</Link>
                     </Button>
                   )}
                   {showSignup && (
-                    <Button asChild className="flex-1" onClick={() => setMobileOpen(false)}>
+                    <Button asChild className="flex-1 rounded-full" onClick={() => setMobileOpen(false)}>
                       <Link href="/signup">{t('nav.signup')}</Link>
                     </Button>
                   )}

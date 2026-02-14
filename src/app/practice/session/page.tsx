@@ -518,8 +518,8 @@ function PracticeSessionInner() {
                           'w-full text-left p-4 rounded-lg border-2 transition-all',
                           !answer && 'hover:border-primary hover:bg-primary/5 cursor-pointer',
                           isSelected && !showFeedback && 'border-primary bg-primary/5',
-                          showFeedback && isCorrect && 'border-green-500 bg-green-50',
-                          showFeedback && isSelected && !isCorrect && 'border-red-500 bg-red-50',
+                          showFeedback && isCorrect && 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30',
+                          showFeedback && isSelected && !isCorrect && 'border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-950/30',
                           showFeedback && !isSelected && !isCorrect && 'opacity-50'
                         )}
                       >
@@ -568,10 +568,10 @@ function PracticeSessionInner() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200"
+                  className="mt-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800"
                 >
-                  <p className="text-sm font-medium text-blue-800 mb-1">Explanation</p>
-                  <p className="text-sm text-blue-700">{currentQuestion.explanation}</p>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">Explanation</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">{currentQuestion.explanation}</p>
                 </motion.div>
               )}
 
@@ -585,7 +585,7 @@ function PracticeSessionInner() {
                     <motion.p
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="text-sm text-muted-foreground mt-2 p-3 bg-yellow-50 rounded-lg"
+                      className="text-sm text-muted-foreground mt-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg"
                     >
                       {currentQuestion.hints[0]}
                     </motion.p>

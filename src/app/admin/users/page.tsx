@@ -179,9 +179,9 @@ export default function AdminUsersPage() {
   };
 
   const roleColors: Record<string, string> = {
-    admin: 'bg-red-100 text-red-700',
-    moderator: 'bg-blue-100 text-blue-700',
-    student: 'bg-gray-100 text-gray-700',
+    admin: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    moderator: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    student: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
   };
 
   return (
@@ -354,7 +354,7 @@ function UserCard({
   ];
 
   return (
-    <Card className={targetUser.banned ? 'border-red-200 bg-red-50/30' : ''}>
+    <Card className={targetUser.banned ? 'border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-950/30' : ''}>
       <CardContent className="py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

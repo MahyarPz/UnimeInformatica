@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/components/ui/toast";
 import { ClientLayout } from "@/components/layout/ClientLayout";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
 
 // Force all pages to be dynamically rendered (no SSG) — Firebase needs runtime env vars
 export const dynamic = 'force-dynamic';
@@ -35,13 +36,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <ToastProvider>
-            <ClientLayout>
-              {children}
-            </ClientLayout>
-          </ToastProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <ClientLayout>
+                {children}
+              </ClientLayout>
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -698,7 +698,7 @@ export default function AdminSettingsPage() {
               <CardDescription>Display-only settings. Firebase Auth email templates are managed in the Firebase Console.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 flex items-start gap-2">
+              <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3 text-sm text-blue-800 dark:text-blue-200 flex items-start gap-2">
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>
                   Firebase Auth email templates (verification, password reset) are configured in the{' '}

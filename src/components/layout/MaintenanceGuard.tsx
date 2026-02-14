@@ -63,10 +63,12 @@ export function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   // Show maintenance page
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
-      <div className="max-w-md text-center space-y-4">
-        <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto" />
-        <h1 className="text-2xl font-bold">Under Maintenance</h1>
-        <p className="text-muted-foreground">
+      <div className="max-w-md text-center space-y-6">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-yellow-100 dark:bg-yellow-900/30 mx-auto">
+          <AlertTriangle className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Under Maintenance</h1>
+        <p className="text-muted-foreground leading-relaxed">
           {maintenance.message ||
             'We are currently performing scheduled maintenance. Please check back soon.'}
         </p>

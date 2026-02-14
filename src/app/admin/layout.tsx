@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { t } from '@/lib/i18n';
 import CommandPalette from '@/components/admin/CommandPalette';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 const adminModules = [
   { href: '/admin', label: t('admin.dashboard'), icon: LayoutDashboard, exact: true },
@@ -91,20 +92,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
+    <div className="min-h-screen flex bg-muted/20">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col border-r bg-background">
-        <div className="p-4 border-b">
-          <Link href="/admin" className="flex items-center gap-2 font-bold text-lg">
-            <Shield className="h-6 w-6 text-primary" />
+      <aside className="hidden lg:flex w-64 flex-col border-r border-border/50 bg-card">
+        <div className="p-4 border-b border-border/50">
+          <Link href="/admin" className="flex items-center gap-2.5 font-bold text-lg">
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary text-primary-foreground">
+              <Shield className="h-4 w-4" />
+            </div>
             Admin Panel
           </Link>
         </div>
-        <ScrollArea className="flex-1 py-2">
-          <nav className="px-2 space-y-0.5">
+        <ScrollArea className="flex-1 py-3">
+          <nav className="px-3 space-y-0.5">
             {adminModules.map((item, i) => {
               if ('type' in item && item.type === 'separator') {
-                return <Separator key={i} className="my-2" />;
+                return <Separator key={i} className="my-3" />;
               }
               const mod = item as { href: string; label: string; icon: any; exact?: boolean };
               const isActive = mod.exact
@@ -115,9 +118,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   key={mod.href}
                   href={mod.href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-primary text-primary-foreground'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
@@ -128,7 +131,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             })}
           </nav>
         </ScrollArea>
-        <div className="p-3 border-t">
+        <div className="p-3 border-t border-border/50">
           <Button variant="ghost" className="w-full justify-start text-sm" asChild>
             <Link href="/">
               <ChevronLeft className="h-4 w-4 mr-2" /> Back to Site
@@ -140,20 +143,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Mobile Sidebar */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="fixed left-0 top-0 bottom-0 w-72 bg-background border-r overflow-y-auto">
-            <div className="p-4 border-b flex items-center justify-between">
-              <span className="font-bold text-lg flex items-center gap-2">
-                <Shield className="h-6 w-6 text-primary" /> Admin
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <aside className="fixed left-0 top-0 bottom-0 w-72 bg-card border-r border-border/50 overflow-y-auto shadow-xl">
+            <div className="p-4 border-b border-border/50 flex items-center justify-between">
+              <span className="font-bold text-lg flex items-center gap-2.5">
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary text-primary-foreground">
+                  <Shield className="h-4 w-4" />
+                </div>
+                Admin
               </span>
-              <button onClick={() => setSidebarOpen(false)}>
+              <button onClick={() => setSidebarOpen(false)} className="rounded-lg p-1 hover:bg-accent transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <nav className="px-2 py-2 space-y-0.5">
+            <nav className="px-3 py-3 space-y-0.5">
               {adminModules.map((item, i) => {
                 if ('type' in item && item.type === 'separator') {
-                  return <Separator key={i} className="my-2" />;
+                  return <Separator key={i} className="my-3" />;
                 }
                 const mod = item as { href: string; label: string; icon: any; exact?: boolean };
                 const isActive = mod.exact ? pathname === mod.href : pathname?.startsWith(mod.href) && mod.href !== '/admin';
@@ -163,8 +169,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     href={mod.href}
                     onClick={() => setSidebarOpen(false)}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
-                      isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                      isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent'
                     )}
                   >
                     <mod.icon className="h-4 w-4" />
@@ -173,7 +179,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 );
               })}
             </nav>
-            <div className="p-3 border-t">
+            <div className="p-3 border-t border-border/50">
               <Button variant="ghost" className="w-full justify-start text-sm" asChild>
                 <Link href="/"><ChevronLeft className="h-4 w-4 mr-2" /> Back to Site</Link>
               </Button>
@@ -185,13 +191,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="h-14 border-b bg-background flex items-center px-4 lg:px-6 gap-4">
-          <button className="lg:hidden" onClick={() => setSidebarOpen(true)}>
+        <header className="h-14 border-b border-border/50 bg-card/80 backdrop-blur-sm flex items-center px-4 lg:px-6 gap-4 sticky top-0 z-30">
+          <button className="lg:hidden rounded-lg p-1 hover:bg-accent transition-colors" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex-1" />
           <CommandPalette />
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+          <ThemeToggle />
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors">
             {logoUrl ? (
               <img src={logoUrl} alt={appName} className="h-4 w-4 rounded object-contain" />
             ) : (
@@ -202,8 +209,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          {children}
+        <main className="flex-1 p-4 lg:p-6 overflow-auto bg-background">
+          <div className="page-enter">
+            {children}
+          </div>
         </main>
       </div>
     </div>

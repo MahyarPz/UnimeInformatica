@@ -42,9 +42,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={toast.id}
             className={cn(
-              "rounded-lg border p-4 shadow-lg animate-fade-in bg-background",
-              toast.variant === 'destructive' && "border-destructive bg-destructive/10",
-              toast.variant === 'success' && "border-green-500 bg-green-50"
+              "rounded-xl border border-border/60 p-4 shadow-lg animate-fade-in bg-card backdrop-blur-sm",
+              toast.variant === 'destructive' && "border-destructive/50 bg-destructive/10 dark:bg-destructive/20",
+              toast.variant === 'success' && "border-green-500/50 bg-green-50 dark:bg-green-950/30"
             )}
           >
             <div className="flex items-start justify-between">

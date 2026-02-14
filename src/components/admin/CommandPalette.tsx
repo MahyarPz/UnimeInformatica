@@ -35,7 +35,7 @@ const ENTITY_CONFIG: Record<SearchEntityType, { label: string; color: string; ic
   user: { label: 'User', color: 'bg-indigo-100 text-indigo-800', icon: Users },
   announcement: { label: 'Announcement', color: 'bg-yellow-100 text-yellow-800', icon: Megaphone },
   lab: { label: 'Lab', color: 'bg-teal-100 text-teal-800', icon: FlaskConical },
-  action: { label: 'Action', color: 'bg-gray-100 text-gray-800', icon: Zap },
+  action: { label: 'Action', color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200', icon: Zap },
 };
 
 export default function CommandPalette() {

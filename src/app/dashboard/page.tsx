@@ -326,12 +326,12 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         {q.status === 'rejected' && (q as any).reviewFeedback && (
-                          <div className="bg-red-50 p-2 rounded text-xs text-red-700">
+                          <div className="bg-red-50 dark:bg-red-950/30 p-2 rounded text-xs text-red-700 dark:text-red-300">
                             <strong>Feedback:</strong> {(q as any).reviewFeedback}
                           </div>
                         )}
                         {q.status === 'approved' && (
-                          <div className="bg-green-50 p-2 rounded text-xs text-green-700">
+                          <div className="bg-green-50 dark:bg-green-950/30 p-2 rounded text-xs text-green-700 dark:text-green-300">
                             ✅ This question has been approved and added to the public pool!
                           </div>
                         )}

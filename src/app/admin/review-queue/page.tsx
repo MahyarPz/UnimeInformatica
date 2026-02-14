@@ -266,7 +266,7 @@ function ReviewCard({
             {q?.type === 'mcq' && q?.options && Array.isArray(q.options) && (
               <div className="space-y-1">
                 {q.options.map((opt: any, idx: number) => (
-                  <div key={idx} className={`px-2 py-1 rounded text-sm ${(opt.isCorrect || idx === q.correctIndex) ? 'bg-green-50 font-medium text-green-700' : 'bg-muted'}`}>
+                  <div key={idx} className={`px-2 py-1 rounded text-sm ${(opt.isCorrect || idx === q.correctIndex) ? 'bg-green-50 dark:bg-green-950/30 font-medium text-green-700 dark:text-green-300' : 'bg-muted'}`}>
                     <strong>{String.fromCharCode(65 + idx)}.</strong> {typeof opt === 'string' ? opt : opt.text}
                   </div>
                 ))}

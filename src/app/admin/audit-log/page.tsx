@@ -117,7 +117,7 @@ export default function AdminAuditLogPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">@{log.actorUsername}</span>
-                      <Badge className={`text-xs ${actionColors[log.action] || 'bg-gray-100 text-gray-700'}`}>
+                      <Badge className={`text-xs ${actionColors[log.action] || 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
                         {log.action?.replace(/_/g, ' ')}
                       </Badge>
                       <Badge variant="outline" className="text-xs">{log.actorRole}</Badge>

@@ -39,50 +39,82 @@ function resolveIcon(name?: string): React.ElementType {
   return ICON_MAP[name] || Zap;
 }
 
-const fadeIn = {
-  initial: { opacity: 0, y: 20 },
+const fadeUp = {
+  initial: { opacity: 0, y: 24 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
+  transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+};
+
+const staggerContainer = {
+  animate: { transition: { staggerChildren: 0.08 } },
 };
 
 // ─── Block Renderers ──────────────────────────────────────
 
 function HeroBlock({ content }: { content: any }) {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10 py-20 md:py-32">
+    <section className="relative overflow-hidden py-24 md:py-36 lg:py-44">
+      {/* Background: dot grid + glow blobs */}
+      <div className="absolute inset-0 dot-grid" />
+      <div className="absolute inset-0 noise-overlay" />
+      <div className="glow-blob animate-glow-shift w-[500px] h-[500px] bg-primary/30 top-[-10%] left-[10%]" />
+      <div className="glow-blob animate-glow-shift w-[400px] h-[400px] bg-blue-500/20 bottom-[-5%] right-[5%]" style={{ animationDelay: '3s' }} />
+      <div className="glow-blob animate-glow-shift w-[300px] h-[300px] bg-violet-500/15 top-[20%] right-[25%]" style={{ animationDelay: '5s' }} />
+
       <div className="container relative z-10">
-        <motion.div {...fadeIn} className="max-w-3xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-medium">
-            <GraduationCap className="h-4 w-4" />
-            Course-First Learning Platform
-          </div>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
+        <motion.div
+          initial="initial"
+          animate="animate"
+          variants={staggerContainer}
+          className="max-w-3xl mx-auto text-center space-y-8"
+        >
+          {/* Badge chip */}
+          <motion.div variants={fadeUp}>
+            <span className="inline-flex items-center gap-2 border border-primary/20 bg-primary/5 text-primary px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm">
+              <GraduationCap className="h-4 w-4" />
+              Course-First Learning Platform
+            </span>
+          </motion.div>
+
+          {/* Title */}
+          <motion.h1
+            variants={fadeUp}
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]"
+          >
             {content.title}
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+          </motion.h1>
+
+          {/* Subtitle */}
+          <motion.p
+            variants={fadeUp}
+            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
+          >
             {content.subtitle}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          </motion.p>
+
+          {/* CTAs */}
+          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             {content.primaryCtaLabel && (
-              <Button size="lg" asChild>
+              <Button size="lg" asChild className="rounded-full px-8 h-12 text-base shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300">
                 <Link href={content.primaryCtaHref || '/courses'}>
                   {content.primaryCtaLabel} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             )}
             {content.secondaryCtaLabel && (
-              <Button size="lg" variant="outline" asChild>
+              <Button size="lg" variant="outline" asChild className="rounded-full px-8 h-12 text-base border-border/60 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300">
                 <Link href={content.secondaryCtaHref || '/practice'}>
                   {content.secondaryCtaLabel}
                 </Link>
               </Button>
             )}
-          </div>
+          </motion.div>
+
+          {/* Trust bar */}
+          <motion.div variants={fadeUp} className="pt-6">
+            <p className="text-xs text-muted-foreground/60 uppercase tracking-widest">Built for students, by students</p>
+          </motion.div>
         </motion.div>
-      </div>
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
       </div>
     </section>
   );
@@ -90,31 +122,38 @@ function HeroBlock({ content }: { content: any }) {
 
 function FeaturesBlock({ content }: { content: any }) {
   return (
-    <section className="py-16 md:py-24">
+    <section className="py-20 md:py-28 border-t border-border/30">
       <div className="container">
-        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">{content.heading}</h2>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">{content.heading}</h2>
+          <div className="w-12 h-1 rounded-full bg-primary mx-auto" />
         </motion.div>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {(content.items || []).map((item: any, i: number) => {
             const Icon = resolveIcon(item.icon);
             return (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.08, duration: 0.5 }}
               >
-                <Card className="h-full hover:shadow-md transition-shadow">
+                <Card className="h-full group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
                   <CardHeader>
-                    <div className="inline-flex p-3 rounded-lg w-fit bg-primary/10 text-primary">
-                      <Icon className="h-6 w-6" />
+                    <div className="inline-flex p-2.5 rounded-xl w-fit bg-primary/8 text-primary mb-2 group-hover:bg-primary/12 transition-colors">
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <CardTitle className="text-xl">{item.title}</CardTitle>
+                    <CardTitle className="text-lg">{item.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">{item.description}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -135,36 +174,38 @@ function FeaturedCoursesBlock({ content, courses }: { content: any; courses: Cou
   if (display.length === 0) return null;
 
   return (
-    <section className="py-16 md:py-24 bg-muted/50">
+    <section className="py-20 md:py-28 bg-muted/30 border-t border-border/30">
       <div className="container">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
           <div>
-            <h2 className="text-3xl font-bold">{content.heading || 'Available Courses'}</h2>
-            <p className="text-muted-foreground mt-1">Start your journey today</p>
+            <h2 className="text-3xl md:text-4xl font-bold">{content.heading || 'Available Courses'}</h2>
+            <p className="text-muted-foreground mt-2">Start your journey today</p>
           </div>
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="rounded-full self-start sm:self-auto">
             <Link href="/courses">View All <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {display.map((course, i) => (
             <motion.div
               key={course.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.08, duration: 0.5 }}
             >
               <Link href={`/courses/${course.slug}`}>
-                <Card className="h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
+                <Card className="h-full group cursor-pointer hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-0.5">
                   <CardHeader>
                     <div className="flex items-center gap-2 text-primary mb-2">
-                      <BookOpen className="h-5 w-5" />
+                      <div className="p-1.5 rounded-lg bg-primary/8">
+                        <BookOpen className="h-4 w-4" />
+                      </div>
                     </div>
-                    <CardTitle className="text-lg">{course.title}</CardTitle>
+                    <CardTitle className="text-base group-hover:text-primary transition-colors">{course.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">{course.shortDescription}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{course.shortDescription}</p>
                   </CardContent>
                 </Card>
               </Link>
@@ -178,15 +219,31 @@ function FeaturedCoursesBlock({ content, courses }: { content: any; courses: Cou
 
 function StatsBlock({ content }: { content: any }) {
   return (
-    <section className="py-16 md:py-24">
+    <section className="py-20 md:py-28 border-t border-border/30">
       <div className="container text-center">
-        {content.heading && <h2 className="text-3xl font-bold mb-8">{content.heading}</h2>}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        {content.heading && (
+          <motion.h2
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className="text-3xl md:text-4xl font-bold mb-12"
+          >
+            {content.heading}
+          </motion.h2>
+        )}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto">
           {(content.items || []).map((item: any, i: number) => (
-            <div key={i} className="space-y-2">
-              <div className="text-3xl font-bold">{item.value}</div>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              className="space-y-1"
+            >
+              <div className="text-3xl md:text-4xl font-bold bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">{item.value}</div>
               <div className="text-sm text-muted-foreground">{item.label}</div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -196,18 +253,19 @@ function StatsBlock({ content }: { content: any }) {
 
 function FAQBlock({ content }: { content: any }) {
   return (
-    <section className="py-16 md:py-24 bg-muted/50">
+    <section className="py-20 md:py-28 bg-muted/30 border-t border-border/30">
       <div className="container max-w-3xl">
-        <h2 className="text-3xl font-bold text-center mb-8">{content.heading}</h2>
-        <div className="space-y-4">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">{content.heading}</h2>
+        <div className="w-12 h-1 rounded-full bg-primary mx-auto mb-12" />
+        <div className="space-y-3">
           {(content.items || []).map((item: any, i: number) => (
-            <Card key={i}>
+            <Card key={i} className="hover:border-primary/20 transition-colors">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">{item.q}</CardTitle>
+                <CardTitle className="text-base">{item.q}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div
-                  className="text-muted-foreground prose prose-sm max-w-none"
+                  className="text-sm text-muted-foreground prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(item.aMarkdown || '') }}
                 />
               </CardContent>
@@ -221,9 +279,9 @@ function FAQBlock({ content }: { content: any }) {
 
 function CTABlock({ content }: { content: any }) {
   return (
-    <section className="py-16 md:py-24">
+    <section className="py-20 md:py-28 border-t border-border/30">
       <div className="container max-w-2xl text-center space-y-6">
-        <h2 className="text-3xl font-bold">{content.heading}</h2>
+        <h2 className="text-3xl md:text-4xl font-bold">{content.heading}</h2>
         {content.bodyMarkdown && (
           <div
             className="text-muted-foreground prose prose-sm mx-auto max-w-none"
@@ -231,7 +289,7 @@ function CTABlock({ content }: { content: any }) {
           />
         )}
         {content.buttonLabel && (
-          <Button size="lg" asChild>
+          <Button size="lg" asChild className="rounded-full px-8 h-12 text-base shadow-lg shadow-primary/20">
             <Link href={content.buttonHref || '/signup'}>
               {content.buttonLabel} <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -244,10 +302,11 @@ function CTABlock({ content }: { content: any }) {
 
 function HowItWorksBlock({ content }: { content: any }) {
   return (
-    <section className="py-16 md:py-24 bg-muted/50">
+    <section className="py-20 md:py-28 bg-muted/30 border-t border-border/30">
       <div className="container">
-        <h2 className="text-3xl font-bold text-center mb-12">{content.heading}</h2>
-        <div className="grid md:grid-cols-3 gap-8">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">{content.heading}</h2>
+        <div className="w-12 h-1 rounded-full bg-primary mx-auto mb-16" />
+        <div className="grid md:grid-cols-3 gap-12">
           {(content.steps || []).map((step: any, i: number) => (
             <motion.div
               key={i}
@@ -255,13 +314,13 @@ function HowItWorksBlock({ content }: { content: any }) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.15 }}
-              className="text-center space-y-3"
+              className="text-center space-y-4"
             >
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-lg">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-lg shadow-lg shadow-primary/20">
                 {i + 1}
               </div>
               <h3 className="text-xl font-semibold">{step.title}</h3>
-              <p className="text-muted-foreground">{step.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
             </motion.div>
           ))}
         </div>
@@ -272,19 +331,20 @@ function HowItWorksBlock({ content }: { content: any }) {
 
 function TestimonialsBlock({ content }: { content: any }) {
   return (
-    <section className="py-16 md:py-24">
+    <section className="py-20 md:py-28 border-t border-border/30">
       <div className="container">
-        <h2 className="text-3xl font-bold text-center mb-12">{content.heading}</h2>
-        <div className="grid md:grid-cols-3 gap-6">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">{content.heading}</h2>
+        <div className="w-12 h-1 rounded-full bg-primary mx-auto mb-12" />
+        <div className="grid md:grid-cols-3 gap-5">
           {(content.items || []).map((item: any, i: number) => (
-            <Card key={i} className="h-full">
+            <Card key={i} className="h-full hover:border-primary/20 transition-colors">
               <CardContent className="pt-6">
-                <p className="text-muted-foreground italic mb-4">&ldquo;{item.text}&rdquo;</p>
-                <div className="flex items-center gap-3">
+                <p className="text-muted-foreground italic mb-4 text-sm leading-relaxed">&ldquo;{item.text}&rdquo;</p>
+                <div className="flex items-center gap-3 pt-4 border-t border-border/50">
                   {item.avatarUrl && (
-                    <img src={item.avatarUrl} alt={item.name} className="w-10 h-10 rounded-full object-cover" />
+                    <img src={item.avatarUrl} alt={item.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-border" />
                   )}
-                  <span className="font-medium">{item.name}</span>
+                  <span className="text-sm font-medium">{item.name}</span>
                 </div>
               </CardContent>
             </Card>
@@ -296,14 +356,16 @@ function TestimonialsBlock({ content }: { content: any }) {
 }
 
 function AnnouncementBlock({ content }: { content: any }) {
-  const bgClass = content.style === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-    : content.style === 'success' ? 'bg-green-50 border-green-200 text-green-800'
-    : 'bg-blue-50 border-blue-200 text-blue-800';
+  const bgClass = content.style === 'warning'
+    ? 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/40 dark:border-yellow-800 dark:text-yellow-200'
+    : content.style === 'success'
+    ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950/40 dark:border-green-800 dark:text-green-200'
+    : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200';
 
   return (
     <section className="py-4">
       <div className="container">
-        <div className={`rounded-lg border p-4 text-center ${bgClass}`}>
+        <div className={`rounded-xl border p-4 text-center ${bgClass}`}>
           <p className="text-sm font-medium">
             {content.href ? (
               <Link href={content.href} className="underline hover:no-underline">{content.text}</Link>

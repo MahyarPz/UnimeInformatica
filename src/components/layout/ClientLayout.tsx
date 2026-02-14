@@ -27,7 +27,7 @@ function Footer() {
   if (!hasColumns && !hasSocials) {
     // Simple footer
     return (
-      <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+      <footer className="border-t border-border/50 py-8 text-center text-sm text-muted-foreground">
         <div className="container">
           <p>{copyright}</p>
         </div>
@@ -36,19 +36,19 @@ function Footer() {
   }
 
   return (
-    <footer className="border-t py-10">
+    <footer className="border-t border-border/50 bg-muted/30 py-12">
       <div className="container">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {columns.map((col, i) => (
             <div key={i}>
-              <h4 className="font-semibold mb-3">{col.title?.en || ''}</h4>
-              <ul className="space-y-2">
+              <h4 className="font-semibold text-sm uppercase tracking-wider text-foreground/80 mb-4">{col.title?.en || ''}</h4>
+              <ul className="space-y-2.5">
                 {(col.links || [])
                   .filter((l) => l.enabled)
                   .sort((a, b) => a.order - b.order)
                   .map((link, j) => (
                     <li key={j}>
-                      <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">
                         {link.label?.en || ''}
                       </Link>
                     </li>
@@ -59,26 +59,26 @@ function Footer() {
 
           {hasSocials && (
             <div>
-              <h4 className="font-semibold mb-3">Connect</h4>
-              <ul className="space-y-2">
+              <h4 className="font-semibold text-sm uppercase tracking-wider text-foreground/80 mb-4">Connect</h4>
+              <ul className="space-y-2.5">
                 {socials.instagram && (
-                  <li><a href={socials.instagram} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">Instagram</a></li>
+                  <li><a href={socials.instagram} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Instagram</a></li>
                 )}
                 {socials.telegram && (
-                  <li><a href={socials.telegram} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">Telegram</a></li>
+                  <li><a href={socials.telegram} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Telegram</a></li>
                 )}
                 {socials.github && (
-                  <li><a href={socials.github} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">GitHub</a></li>
+                  <li><a href={socials.github} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">GitHub</a></li>
                 )}
                 {socials.website && (
-                  <li><a href={socials.website} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">Website</a></li>
+                  <li><a href={socials.website} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Website</a></li>
                 )}
               </ul>
             </div>
           )}
         </div>
 
-        <div className="mt-8 pt-6 border-t text-center text-sm text-muted-foreground">
+        <div className="mt-10 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground">
           <p>{copyright}</p>
         </div>
       </div>
@@ -91,12 +91,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="min-h-screen flex flex-col transition-opacity duration-200"
+      className="min-h-screen flex flex-col transition-opacity duration-300"
       style={{ opacity: loading ? 0 : 1 }}
     >
       <Navigation />
       <AnnouncementBanner />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 page-enter">{children}</main>
       <Footer />
     </div>
   );
