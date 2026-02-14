@@ -8,6 +8,7 @@ import { PresenceWrapper } from '@/components/layout/PresenceWrapper';
 import { EmailVerificationGuard } from '@/components/layout/EmailVerificationGuard';
 import { MaintenanceGuard } from '@/components/layout/MaintenanceGuard';
 import { SessionExpiredDialog } from '@/components/layout/SessionExpiredDialog';
+import { ParticleTrail } from '@/components/ui/ParticleTrail';
 import { useSessionGuard } from '@/lib/hooks/useSessionGuard';
 import { SiteSettingsProvider, useSiteSettingsContext } from '@/contexts/SiteSettingsContext';
 import { SiteContentProvider, useSiteContentContext } from '@/contexts/SiteContentContext';
@@ -94,6 +95,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       className="min-h-screen flex flex-col transition-opacity duration-300"
       style={{ opacity: loading ? 0 : 1 }}
     >
+      <ParticleTrail particleCount={2} colors={[210, 250, 280]} />
       <Navigation />
       <AnnouncementBanner />
       <main className="flex-1 page-enter">{children}</main>

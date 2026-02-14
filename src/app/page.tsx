@@ -23,6 +23,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Aurora } from '@/components/ui/Aurora';
+import { MouseSpotlight } from '@/components/ui/MouseSpotlight';
+import { TiltCard } from '@/components/ui/TiltCard';
+import { TypewriterText } from '@/components/ui/TypewriterText';
 import { useCourses } from '@/lib/hooks/useCourses';
 import { useSiteContentContext } from '@/contexts/SiteContentContext';
 import { renderSafeMarkdown } from '@/lib/utils/renderSafeMarkdown';
@@ -54,12 +58,11 @@ const staggerContainer = {
 function HeroBlock({ content }: { content: any }) {
   return (
     <section className="relative overflow-hidden py-24 md:py-36 lg:py-44 bg-gradient-to-b from-primary/[0.03] via-background to-background">
-      {/* Background: dot grid + glow blobs */}
+      {/* Aurora background */}
+      <Aurora />
+      {/* Dot grid + noise */}
       <div className="absolute inset-0 dot-grid" />
       <div className="absolute inset-0 noise-overlay" />
-      <div className="glow-blob animate-glow-shift w-[600px] h-[600px] bg-blue-500/40 -top-[15%] -left-[5%]" />
-      <div className="glow-blob animate-glow-shift w-[500px] h-[500px] bg-violet-500/30 -bottom-[10%] -right-[5%]" style={{ animationDelay: '3s' }} />
-      <div className="glow-blob animate-glow-shift w-[400px] h-[400px] bg-indigo-400/25 top-[10%] right-[15%]" style={{ animationDelay: '5s' }} />
 
       <div className="container relative z-10">
         <motion.div
@@ -84,13 +87,31 @@ function HeroBlock({ content }: { content: any }) {
             {content.title}
           </motion.h1>
 
-          {/* Subtitle */}
+          {/* Subtitle — with typewriter cycling */}
           <motion.p
             variants={fadeUp}
             className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
           >
             {content.subtitle}
           </motion.p>
+
+          {/* Typewriter keywords */}
+          <motion.div variants={fadeUp} className="h-8">
+            <span className="text-base md:text-lg font-medium text-primary">
+              <TypewriterText
+                phrases={[
+                  'Adaptive Practice',
+                  'Mini Labs',
+                  'Instant Feedback',
+                  'Smart Analytics',
+                  'Exam Preparation',
+                ]}
+                typingSpeed={65}
+                deletingSpeed={35}
+                pauseMs={2000}
+              />
+            </span>
+          </motion.div>
 
           {/* CTAs */}
           <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
@@ -126,8 +147,9 @@ function HeroBlock({ content }: { content: any }) {
 
 function FeaturesBlock({ content }: { content: any }) {
   return (
-    <section className="py-20 md:py-28 border-t border-border/30">
-      <div className="container">
+    <MouseSpotlight className="overflow-hidden" spotlightClassName="z-0">
+    <section className="relative py-20 md:py-28 border-t border-border/30">
+      <div className="container relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -149,6 +171,7 @@ function FeaturesBlock({ content }: { content: any }) {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.08, duration: 0.5 }}
               >
+                <TiltCard maxTilt={10}>
                 <Card className="h-full group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 bg-card/80 backdrop-blur-sm">
                   <CardHeader>
                     <div className="inline-flex p-2.5 rounded-xl w-fit bg-primary/10 text-primary mb-2 group-hover:bg-primary/15 group-hover:scale-110 transition-all duration-300">
@@ -160,12 +183,14 @@ function FeaturesBlock({ content }: { content: any }) {
                     <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                   </CardContent>
                 </Card>
+                </TiltCard>
               </motion.div>
             );
           })}
         </div>
       </div>
     </section>
+    </MouseSpotlight>
   );
 }
 
@@ -200,6 +225,7 @@ function FeaturedCoursesBlock({ content, courses }: { content: any; courses: Cou
               transition={{ delay: i * 0.08, duration: 0.5 }}
             >
               <Link href={`/courses/${course.slug}`}>
+                <TiltCard maxTilt={8}>
                 <Card className="h-full group cursor-pointer hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1 bg-card/90 backdrop-blur-sm">
                   {course.imageUrl && (
                     <div className="aspect-[16/9] overflow-hidden rounded-t-xl">
@@ -218,6 +244,7 @@ function FeaturedCoursesBlock({ content, courses }: { content: any; courses: Cou
                     <p className="text-sm text-muted-foreground line-clamp-2">{course.shortDescription}</p>
                   </CardContent>
                 </Card>
+                </TiltCard>
               </Link>
             </motion.div>
           ))}
