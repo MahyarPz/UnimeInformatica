@@ -1196,3 +1196,333 @@ export interface DiagnosticCheck {
   howToFix?: string;
   lastCheckedAt?: Date;
 }
+
+// ============================================================
+// GAMIFICATION: XP / LEADERBOARD / LEVEL / SEASON
+// ============================================================
+
+/** user_stats/{uid} — extended with gamification fields */
+export interface GamificationUserStats {
+  uid: string;
+  xpAllTime: number;
+  xpWeekly: number;
+  weeklyKey: string; // e.g. "2026-W07"
+  streakDays: number;
+  lastActiveAt: any;
+  accuracyRolling: number;
+  sessionsCount: number;
+  level: number;
+  levelXp: number; // XP within current level
+  seasonKey: string; // active season id
+  seasonXp: number; // XP earned this season
+  updatedAt: any;
+}
+
+/** user_course_stats/{uid}_{courseId} */
+export interface UserCourseStats {
+  uid: string;
+  courseId: string;
+  xpAllTime: number;
+  xpWeekly: number;
+  weeklyKey: string;
+  accuracyRolling: number;
+  sessionsCount: number;
+  updatedAt: any;
+}
+
+/** Generic leaderboard entry */
+export interface LeaderboardEntry {
+  uid: string;
+  username: string;
+  avatarUrl?: string;
+  xp: number;
+  level?: number;
+  updatedAt: any;
+}
+
+/** Per-course leaderboard entry */
+export interface CourseLeaderboardEntry extends LeaderboardEntry {
+  courseId: string;
+}
+
+/** Season leaderboard entry */
+export interface SeasonLeaderboardEntry {
+  uid: string;
+  username: string;
+  avatarUrl?: string;
+  seasonXp: number;
+  updatedAt: any;
+}
+
+/** leaderboard_config/singleton */
+export interface LeaderboardConfig {
+  enabled: boolean;
+  visible: boolean;
+  scoringWeights: ScoringWeights;
+  antiCheat: AntiCheatConfig;
+  resetSchedule: string; // cron expression info
+  levelCurve: LevelCurveConfig;
+  seasonsEnabled: boolean;
+}
+
+export interface ScoringWeights {
+  correctMcq: number;
+  wrongMcq: number;
+  sessionBonus: number;
+  accuracy80Bonus: number;
+  accuracy90Bonus: number;
+  labCompletion: number;
+  essayReviewed: number;
+  streakMultipliers: Record<string, number>; // "0-2": 0, "3-6": 5, etc.
+}
+
+export interface AntiCheatConfig {
+  maxXpPerMinute: number;
+  maxSessionsPerHour: number;
+  maxXpPerDay: number;
+}
+
+export interface LevelCurveConfig {
+  base: number; // base XP for level 1
+  growth: number; // quadratic growth factor
+  maxLevel: number;
+}
+
+export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
+  correctMcq: 10,
+  wrongMcq: 2,
+  sessionBonus: 15,
+  accuracy80Bonus: 15,
+  accuracy90Bonus: 25,
+  labCompletion: 80,
+  essayReviewed: 30,
+  streakMultipliers: { '0': 0, '3': 5, '7': 10, '14': 15, '30': 20 },
+};
+
+export const DEFAULT_ANTI_CHEAT: AntiCheatConfig = {
+  maxXpPerMinute: 50,
+  maxSessionsPerHour: 10,
+  maxXpPerDay: 2000,
+};
+
+export const DEFAULT_LEVEL_CURVE: LevelCurveConfig = {
+  base: 100,
+  growth: 25,
+  maxLevel: 50,
+};
+
+export const DEFAULT_LEADERBOARD_CONFIG: LeaderboardConfig = {
+  enabled: true,
+  visible: true,
+  scoringWeights: DEFAULT_SCORING_WEIGHTS,
+  antiCheat: DEFAULT_ANTI_CHEAT,
+  resetSchedule: 'weekly-monday-00:00-Europe/Rome',
+  levelCurve: DEFAULT_LEVEL_CURVE,
+  seasonsEnabled: false,
+};
+
+/** leaderboard_bans/{uid} */
+export interface LeaderboardBan {
+  banned: boolean;
+  reason: string;
+  createdAt: any;
+  createdBy: string;
+}
+
+/** study_activity_daily/{uid}/days/{YYYY-MM-DD} — heatmap source */
+export interface StudyActivityDay {
+  date: string;
+  xpEarned: number;
+  sessions: number;
+  questionsAnswered: number;
+  updatedAt: any;
+}
+
+/** seasons/{seasonKey} */
+export interface Season {
+  seasonKey: string; // e.g. "2026-S1"
+  name: string;
+  startsAt: any;
+  endsAt: any;
+  active: boolean;
+  rules: SeasonRules;
+  createdAt: any;
+}
+
+export interface SeasonRules {
+  xpMultiplier: number;
+  bonusXpPerSession: number;
+}
+
+export const DEFAULT_SEASON_RULES: SeasonRules = {
+  xpMultiplier: 1.0,
+  bonusXpPerSession: 0,
+};
+
+// ============================================================
+// ACHIEVEMENTS
+// ============================================================
+
+export type AchievementId =
+  | 'first_practice'
+  | 'sessions_10'
+  | 'sessions_50'
+  | 'sessions_100'
+  | 'streak_7'
+  | 'streak_30'
+  | 'accuracy_90'
+  | 'first_lab'
+  | 'level_10'
+  | 'level_25'
+  | 'level_50'
+  | 'xp_1000'
+  | 'xp_10000'
+  | 'daily_challenge_complete'
+  | 'weekly_challenge_complete';
+
+export interface AchievementDef {
+  id: AchievementId;
+  title: string;
+  description: string;
+  icon: string; // lucide icon name
+  category: 'practice' | 'streak' | 'accuracy' | 'labs' | 'level' | 'xp' | 'challenge';
+}
+
+export interface UserAchievement {
+  id: AchievementId;
+  earnedAt: any;
+}
+
+export const ACHIEVEMENT_DEFINITIONS: AchievementDef[] = [
+  { id: 'first_practice', title: 'First Steps', description: 'Complete your first practice session', icon: 'Play', category: 'practice' },
+  { id: 'sessions_10', title: 'Getting Serious', description: 'Complete 10 practice sessions', icon: 'Target', category: 'practice' },
+  { id: 'sessions_50', title: 'Dedicated Learner', description: 'Complete 50 practice sessions', icon: 'Award', category: 'practice' },
+  { id: 'sessions_100', title: 'Century Club', description: 'Complete 100 practice sessions', icon: 'Trophy', category: 'practice' },
+  { id: 'streak_7', title: 'Week Warrior', description: 'Maintain a 7-day streak', icon: 'Flame', category: 'streak' },
+  { id: 'streak_30', title: 'Monthly Master', description: 'Maintain a 30-day streak', icon: 'Zap', category: 'streak' },
+  { id: 'accuracy_90', title: 'Sharpshooter', description: 'Achieve 90%+ accuracy in a topic', icon: 'Crosshair', category: 'accuracy' },
+  { id: 'first_lab', title: 'Lab Rat', description: 'Complete your first lab', icon: 'FlaskConical', category: 'labs' },
+  { id: 'level_10', title: 'Rising Star', description: 'Reach Level 10', icon: 'Star', category: 'level' },
+  { id: 'level_25', title: 'Halfway Hero', description: 'Reach Level 25', icon: 'Crown', category: 'level' },
+  { id: 'level_50', title: 'Legendary', description: 'Reach Level 50 (max)', icon: 'Sparkles', category: 'level' },
+  { id: 'xp_1000', title: 'XP Hunter', description: 'Earn 1,000 total XP', icon: 'TrendingUp', category: 'xp' },
+  { id: 'xp_10000', title: 'XP Legend', description: 'Earn 10,000 total XP', icon: 'Rocket', category: 'xp' },
+  { id: 'daily_challenge_complete', title: 'Daily Duel', description: 'Complete a daily challenge', icon: 'Calendar', category: 'challenge' },
+  { id: 'weekly_challenge_complete', title: 'Weekly Warrior', description: 'Complete a weekly challenge', icon: 'CalendarCheck', category: 'challenge' },
+];
+
+// ============================================================
+// CHALLENGES (DAILY / WEEKLY)
+// ============================================================
+
+export type ChallengeType = 'daily' | 'weekly';
+export type ChallengeStatus = 'active' | 'completed' | 'expired';
+
+export interface Challenge {
+  id: string;
+  type: ChallengeType;
+  title: string;
+  description: string;
+  courseId?: string;
+  topicIds?: string[];
+  targetQuestions?: number;
+  targetAccuracy?: number;
+  targetSessions?: number;
+  xpReward: number;
+  startsAt: any;
+  endsAt: any;
+  createdAt: any;
+}
+
+export interface UserChallenge {
+  id: string;
+  challengeId: string;
+  uid: string;
+  type: ChallengeType;
+  status: ChallengeStatus;
+  progress: number; // 0-100
+  questionsCompleted: number;
+  accuracyAchieved: number;
+  sessionsCompleted: number;
+  xpEarned: number;
+  startedAt: any;
+  completedAt?: any;
+  updatedAt: any;
+}
+
+// ============================================================
+// FRIENDS / STUDY SQUAD
+// ============================================================
+
+export type FriendshipStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface Friendship {
+  id: string;
+  fromUid: string;
+  fromUsername: string;
+  toUid: string;
+  toUsername: string;
+  status: FriendshipStatus;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface FriendChallenge {
+  id: string;
+  creatorUid: string;
+  creatorUsername: string;
+  targetUid?: string;
+  courseId: string;
+  topicId?: string;
+  message: string;
+  xpReward: number;
+  status: 'open' | 'accepted' | 'completed';
+  createdAt: any;
+}
+
+// ============================================================
+// NOTIFICATIONS (IN-APP)
+// ============================================================
+
+export type NotificationType =
+  | 'streak_reminder'
+  | 'challenge_result'
+  | 'friend_request'
+  | 'friend_challenge'
+  | 'achievement_earned'
+  | 'level_up'
+  | 'season_start'
+  | 'season_end'
+  | 'admin_message'
+  | 'plan_change'
+  | 'xp_awarded';
+
+export interface AppNotification {
+  id: string;
+  uid: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  read: boolean;
+  actionUrl?: string;
+  metadata?: Record<string, any>;
+  createdAt: any;
+}
+
+// ============================================================
+// PRIVACY SETTINGS (EXTENDED)
+// ============================================================
+
+export interface UserPrivacySettings {
+  publicProfile: boolean;
+  showOnLeaderboard: boolean;
+  showInLiveFeed: boolean;
+  allowFriendRequests: boolean;
+}
+
+export const DEFAULT_PRIVACY_SETTINGS: UserPrivacySettings = {
+  publicProfile: true,
+  showOnLeaderboard: true,
+  showInLiveFeed: true,
+  allowFriendRequests: true,
+};

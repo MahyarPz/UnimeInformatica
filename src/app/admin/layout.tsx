@@ -35,6 +35,7 @@ import {
   Globe,
   Wrench,
   HeartPulse,
+  Trophy,
 } from 'lucide-react';
 import { t } from '@/lib/i18n';
 import CommandPalette from '@/components/admin/CommandPalette';
@@ -61,6 +62,8 @@ const adminModules = [
   { href: '/admin/diagnostics', label: t('admin.diagnostics'), icon: HeartPulse },
   { href: '/admin/analytics', label: t('admin.analytics'), icon: BarChart3 },
   { href: '/admin/monetization', label: t('admin.monetization'), icon: CreditCard },
+  { type: 'separator' },
+  { href: '/admin/gamification', label: t('admin.gamification'), icon: Trophy },
 ] as const;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

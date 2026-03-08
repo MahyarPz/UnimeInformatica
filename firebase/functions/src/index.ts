@@ -750,3 +750,909 @@ export const dailyAnalyticsReconciliation = functions.pubsub
 
     console.log(`Analytics reconciliation for ${yesterday}→${today}: Supporters=${supporterSnap.size}, Pro=${proSnap.size}, DAU=${dau}, WAU=${wau}`);
   });
+
+// ============================================================
+// GAMIFICATION: XP, LEADERBOARD, LEVELS, SEASONS, HEATMAP
+// ============================================================
+
+// ─── Helper: get ISO week key ──────────────────────────────
+function getWeeklyKey(date?: Date): string {
+  const d = date || new Date();
+  const rome = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Rome' }));
+  const yearStart = new Date(rome.getFullYear(), 0, 1);
+  const dayOfYear = Math.floor((rome.getTime() - yearStart.getTime()) / 86400000) + 1;
+  const weekNum = Math.ceil((dayOfYear + yearStart.getDay()) / 7);
+  return `${rome.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+// ─── Helper: compute XP for level ──────────────────────────
+function xpRequiredForLevel(level: number, base = 100, growth = 25): number {
+  return Math.floor(base + growth * level * level);
+}
+
+// ─── Helper: compute level from total XP ───────────────────
+function computeLevel(totalXp: number, base = 100, growth = 25, maxLevel = 50): { level: number; levelXp: number } {
+  let xpUsed = 0;
+  let level = 1;
+  while (level < maxLevel) {
+    const needed = xpRequiredForLevel(level, base, growth);
+    if (xpUsed + needed > totalXp) break;
+    xpUsed += needed;
+    level++;
+  }
+  return { level, levelXp: totalXp - xpUsed };
+}
+
+// ─── Helper: get streak multiplier ─────────────────────────
+function getStreakMultiplier(streakDays: number): number {
+  if (streakDays >= 30) return 20;
+  if (streakDays >= 14) return 15;
+  if (streakDays >= 7) return 10;
+  if (streakDays >= 3) return 5;
+  return 0;
+}
+
+// ─── Helper: load leaderboard config ───────────────────────
+async function getLeaderboardConfig() {
+  const snap = await db.doc('leaderboard_config/singleton').get();
+  if (!snap.exists) {
+    return {
+      enabled: true,
+      visible: true,
+      scoringWeights: {
+        correctMcq: 10, wrongMcq: 2, sessionBonus: 15,
+        accuracy80Bonus: 15, accuracy90Bonus: 25,
+        labCompletion: 80, essayReviewed: 30,
+      },
+      antiCheat: { maxXpPerMinute: 50, maxSessionsPerHour: 10, maxXpPerDay: 2000 },
+      levelCurve: { base: 100, growth: 25, maxLevel: 50 },
+      seasonsEnabled: false,
+    };
+  }
+  return snap.data()!;
+}
+
+// ─── Helper: check if user is banned from leaderboard ──────
+async function isLeaderboardBanned(uid: string): Promise<boolean> {
+  const banSnap = await db.doc(`leaderboard_bans/${uid}`).get();
+  return banSnap.exists && banSnap.data()?.banned === true;
+}
+
+// ─── Helper: rate-limit check ──────────────────────────────
+async function checkRateLimit(uid: string, config: any): Promise<boolean> {
+  const today = getRomeDateKey();
+  const statsSnap = await db.doc(`user_stats/${uid}`).get();
+  const data = statsSnap.exists ? statsSnap.data()! : {};
+
+  // Check daily XP cap
+  const heatmapSnap = await db.doc(`study_activity_daily/${uid}/days/${today}`).get();
+  if (heatmapSnap.exists) {
+    const dayXp = heatmapSnap.data()?.xpEarned || 0;
+    if (dayXp >= (config.antiCheat?.maxXpPerDay || 2000)) {
+      return false; // daily cap exceeded
+    }
+  }
+  return true;
+}
+
+// ─── Helper: get active season ─────────────────────────────
+async function getActiveSeason(): Promise<{ seasonKey: string; rules: any } | null> {
+  const snap = await db.collection('seasons')
+    .where('active', '==', true)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const data = snap.docs[0].data();
+  return { seasonKey: data.seasonKey, rules: data.rules || { xpMultiplier: 1, bonusXpPerSession: 0 } };
+}
+
+// ─── Helper: check & award achievements ────────────────────
+async function checkAchievements(uid: string, statsData: any, username: string) {
+  const achievementsSnap = await db.collection(`users/${uid}/achievements`).get();
+  const earned = new Set(achievementsSnap.docs.map(d => d.id));
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const newAchievements: string[] = [];
+
+  const checks: Array<{ id: string; condition: boolean }> = [
+    { id: 'first_practice', condition: (statsData.sessionsCount || 0) >= 1 },
+    { id: 'sessions_10', condition: (statsData.sessionsCount || 0) >= 10 },
+    { id: 'sessions_50', condition: (statsData.sessionsCount || 0) >= 50 },
+    { id: 'sessions_100', condition: (statsData.sessionsCount || 0) >= 100 },
+    { id: 'streak_7', condition: (statsData.streakDays || 0) >= 7 },
+    { id: 'streak_30', condition: (statsData.streakDays || 0) >= 30 },
+    { id: 'xp_1000', condition: (statsData.xpAllTime || 0) >= 1000 },
+    { id: 'xp_10000', condition: (statsData.xpAllTime || 0) >= 10000 },
+    { id: 'level_10', condition: (statsData.level || 1) >= 10 },
+    { id: 'level_25', condition: (statsData.level || 1) >= 25 },
+    { id: 'level_50', condition: (statsData.level || 1) >= 50 },
+  ];
+
+  for (const check of checks) {
+    if (check.condition && !earned.has(check.id)) {
+      await db.doc(`users/${uid}/achievements/${check.id}`).set({
+        id: check.id,
+        earnedAt: now,
+      });
+      newAchievements.push(check.id);
+    }
+  }
+
+  // Create notifications for new achievements
+  for (const achId of newAchievements) {
+    await db.collection('notifications').add({
+      uid,
+      type: 'achievement_earned',
+      title: 'Achievement Unlocked!',
+      message: `You earned the "${achId}" achievement`,
+      read: false,
+      metadata: { achievementId: achId },
+      createdAt: now,
+    });
+  }
+
+  return newAchievements;
+}
+
+// ─── awardXpForPracticeSession ─────────────────────────────
+// Callable: awardXpForPracticeSession({ uid, courseId, topicId, correctCount, wrongCount, sessionId, durationSec })
+export const awardXpForPracticeSession = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not authenticated');
+  const callerUid = context.auth.uid;
+  const { courseId, topicId, correctCount, wrongCount, sessionId, durationSec } = data;
+  // uid must match caller (or be admin calling for self)
+  const uid = data.uid || callerUid;
+  if (uid !== callerUid && context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Cannot award XP for another user');
+  }
+
+  // Validate session exists and belongs to uid
+  if (sessionId) {
+    const sessionSnap = await db.doc(`exam_sessions/${sessionId}`).get();
+    if (!sessionSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Session not found');
+    }
+    const sessionData = sessionSnap.data()!;
+    if (sessionData.userId !== uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Session does not belong to user');
+    }
+    // Prevent double-awarding
+    if (sessionData.xpAwarded) {
+      return { success: false, reason: 'XP already awarded for this session' };
+    }
+  }
+
+  // Load config
+  const config = await getLeaderboardConfig();
+
+  // Check if leaderboard enabled
+  if (!config.enabled) {
+    return { success: false, reason: 'Leaderboard system is disabled' };
+  }
+
+  // Check ban
+  if (await isLeaderboardBanned(uid)) {
+    return { success: false, reason: 'User is banned from leaderboard' };
+  }
+
+  // Rate limit
+  if (!(await checkRateLimit(uid, config))) {
+    // Log suspicious behavior
+    await db.collection('audit_log').add({
+      action: 'gamification.rate_limit_hit',
+      category: 'admin',
+      actorUid: uid,
+      actorUsername: await getUsername(uid),
+      actorRole: 'user',
+      details: { sessionId, courseId },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: false, reason: 'Rate limit exceeded. Please slow down.' };
+  }
+
+  const weights = config.scoringWeights || {};
+  const totalQuestions = (correctCount || 0) + (wrongCount || 0);
+  const accuracy = totalQuestions > 0 ? ((correctCount || 0) / totalQuestions) * 100 : 0;
+
+  // Compute base XP
+  let xp = 0;
+  xp += (correctCount || 0) * (weights.correctMcq || 10);
+  xp += (wrongCount || 0) * (weights.wrongMcq || 2);
+  xp += (weights.sessionBonus || 15); // session completion bonus
+  if (accuracy >= 90) xp += (weights.accuracy90Bonus || 25);
+  else if (accuracy >= 80) xp += (weights.accuracy80Bonus || 15);
+
+  // Streak multiplier
+  const statsSnap = await db.doc(`user_stats/${uid}`).get();
+  const currentStats = statsSnap.exists ? statsSnap.data()! : {};
+  const streakDays = currentStats.streakDays || 0;
+  const streakMult = getStreakMultiplier(streakDays);
+  xp = Math.floor(xp * (1 + streakMult / 100));
+
+  // Season bonus
+  const activeSeason = await getActiveSeason();
+  let seasonXpDelta = 0;
+  if (activeSeason) {
+    const { rules } = activeSeason;
+    xp = Math.floor(xp * (rules.xpMultiplier || 1));
+    xp += (rules.bonusXpPerSession || 0);
+    seasonXpDelta = xp;
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const today = getRomeDateKey();
+  const weeklyKey = getWeeklyKey();
+  const username = await getUsername(uid);
+
+  // Compute new total and level
+  const oldXpAllTime = currentStats.xpAllTime || 0;
+  const newXpAllTime = oldXpAllTime + xp;
+  const levelCurve = config.levelCurve || { base: 100, growth: 25, maxLevel: 50 };
+  const { level: newLevel, levelXp: newLevelXp } = computeLevel(newXpAllTime, levelCurve.base, levelCurve.growth, levelCurve.maxLevel);
+  const oldLevel = currentStats.level || 1;
+
+  // Compute rolling accuracy
+  const oldTotal = (currentStats.sessionsCount || 0) * (currentStats.accuracyRolling || 0) / 100;
+  const newRollingAccuracy = ((currentStats.sessionsCount || 0) + 1) > 0
+    ? ((oldTotal * (currentStats.sessionsCount || 0) + accuracy) / ((currentStats.sessionsCount || 0) + 1))
+    : accuracy;
+
+  const batch = db.batch();
+
+  // 1) Update user_stats/{uid}
+  const userStatsRef = db.doc(`user_stats/${uid}`);
+  const weeklyXpField = (currentStats.weeklyKey === weeklyKey) ? (currentStats.xpWeekly || 0) + xp : xp;
+  batch.set(userStatsRef, {
+    uid,
+    xpAllTime: admin.firestore.FieldValue.increment(xp),
+    xpWeekly: (currentStats.weeklyKey === weeklyKey) ? admin.firestore.FieldValue.increment(xp) : xp,
+    weeklyKey,
+    streakDays,
+    lastActiveAt: now,
+    accuracyRolling: Math.round(newRollingAccuracy * 100) / 100,
+    sessionsCount: admin.firestore.FieldValue.increment(1),
+    level: newLevel,
+    levelXp: newLevelXp,
+    seasonKey: activeSeason?.seasonKey || '',
+    seasonXp: activeSeason ? admin.firestore.FieldValue.increment(seasonXpDelta) : (currentStats.seasonXp || 0),
+    updatedAt: now,
+  }, { merge: true });
+
+  // 2) Update user_course_stats/{uid}_{courseId}
+  if (courseId) {
+    const courseStatsRef = db.doc(`user_course_stats/${uid}_${courseId}`);
+    const courseSnap = await courseStatsRef.get();
+    const courseData = courseSnap.exists ? courseSnap.data()! : {};
+    batch.set(courseStatsRef, {
+      uid,
+      courseId,
+      xpAllTime: admin.firestore.FieldValue.increment(xp),
+      xpWeekly: (courseData.weeklyKey === weeklyKey) ? admin.firestore.FieldValue.increment(xp) : xp,
+      weeklyKey,
+      accuracyRolling: Math.round(accuracy * 100) / 100,
+      sessionsCount: admin.firestore.FieldValue.increment(1),
+      updatedAt: now,
+    }, { merge: true });
+  }
+
+  // 3) Update leaderboard global weekly
+  const weeklyGlobalRef = db.doc(`leaderboard_weekly_global/${weeklyKey}/entries/${uid}`);
+  batch.set(weeklyGlobalRef, {
+    uid, username,
+    xp: admin.firestore.FieldValue.increment(xp),
+    level: newLevel,
+    updatedAt: now,
+  }, { merge: true });
+
+  // 4) Update leaderboard all-time global
+  const alltimeGlobalRef = db.doc(`leaderboard_alltime_global/entries/${uid}`);
+  batch.set(alltimeGlobalRef, {
+    uid, username,
+    xp: admin.firestore.FieldValue.increment(xp),
+    level: newLevel,
+    updatedAt: now,
+  }, { merge: true });
+
+  // 5) Course leaderboards
+  if (courseId) {
+    const weeklyCourseRef = db.doc(`leaderboard_weekly_course/${weeklyKey}_${courseId}/entries/${uid}`);
+    batch.set(weeklyCourseRef, {
+      uid, courseId,
+      xp: admin.firestore.FieldValue.increment(xp),
+      updatedAt: now,
+    }, { merge: true });
+
+    const alltimeCourseRef = db.doc(`leaderboard_alltime_course/${courseId}/entries/${uid}`);
+    batch.set(alltimeCourseRef, {
+      uid, courseId,
+      xp: admin.firestore.FieldValue.increment(xp),
+      updatedAt: now,
+    }, { merge: true });
+  }
+
+  // 6) Season leaderboard
+  if (activeSeason && seasonXpDelta > 0) {
+    const seasonLbRef = db.doc(`season_leaderboard/${activeSeason.seasonKey}/entries/${uid}`);
+    batch.set(seasonLbRef, {
+      uid, username,
+      seasonXp: admin.firestore.FieldValue.increment(seasonXpDelta),
+      updatedAt: now,
+    }, { merge: true });
+  }
+
+  // 7) Study heatmap
+  const heatmapRef = db.doc(`study_activity_daily/${uid}/days/${today}`);
+  batch.set(heatmapRef, {
+    date: today,
+    xpEarned: admin.firestore.FieldValue.increment(xp),
+    sessions: admin.firestore.FieldValue.increment(1),
+    questionsAnswered: admin.firestore.FieldValue.increment(totalQuestions),
+    updatedAt: now,
+  }, { merge: true });
+
+  // 8) Mark session as XP-awarded
+  if (sessionId) {
+    batch.update(db.doc(`exam_sessions/${sessionId}`), {
+      xpAwarded: true,
+      xpAmount: xp,
+      updatedAt: now,
+    });
+  }
+
+  // 9) Live activity feed
+  batch.set(db.collection('activity_events').doc(), {
+    type: 'xp_earned',
+    category: 'practice',
+    actorUid: uid,
+    actorUsername: username,
+    actorRole: 'user',
+    metadata: { xp, courseId, topicId, accuracy: Math.round(accuracy) },
+    severity: 'low',
+    visibility: 'public',
+    timestamp: now,
+  });
+
+  await batch.commit();
+
+  // Check achievements (outside batch for simplicity)
+  const updatedStats = {
+    ...currentStats,
+    xpAllTime: newXpAllTime,
+    sessionsCount: (currentStats.sessionsCount || 0) + 1,
+    level: newLevel,
+    streakDays,
+  };
+  const newAchievements = await checkAchievements(uid, updatedStats, username);
+
+  // Level up notification
+  if (newLevel > oldLevel) {
+    await db.collection('notifications').add({
+      uid,
+      type: 'level_up',
+      title: 'Level Up!',
+      message: `Congratulations! You reached Level ${newLevel}!`,
+      read: false,
+      metadata: { oldLevel, newLevel },
+      createdAt: now,
+    });
+  }
+
+  return {
+    success: true,
+    xpAwarded: xp,
+    newXpAllTime,
+    level: newLevel,
+    levelXp: newLevelXp,
+    levelXpRequired: xpRequiredForLevel(newLevel, levelCurve.base, levelCurve.growth),
+    leveledUp: newLevel > oldLevel,
+    newAchievements,
+    weeklyKey,
+    streakMultiplier: streakMult,
+  };
+});
+
+// ─── awardXpForLabCompletion ───────────────────────────────
+export const awardXpForLabCompletion = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not authenticated');
+  const callerUid = context.auth.uid;
+  const { courseId, labId } = data;
+  const uid = data.uid || callerUid;
+  if (uid !== callerUid && context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Cannot award XP for another user');
+  }
+
+  // Validate lab session exists
+  if (labId) {
+    const labSessionSnap = await db.collection('lab_sessions')
+      .where('labId', '==', labId)
+      .where('userId', '==', uid)
+      .where('status', '==', 'completed')
+      .limit(1)
+      .get();
+
+    if (labSessionSnap.empty) {
+      throw new functions.https.HttpsError('not-found', 'No completed lab session found');
+    }
+    const labSession = labSessionSnap.docs[0];
+    if (labSession.data().xpAwarded) {
+      return { success: false, reason: 'XP already awarded for this lab' };
+    }
+    // Mark as awarded
+    await labSession.ref.update({ xpAwarded: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+  }
+
+  const config = await getLeaderboardConfig();
+  if (!config.enabled) return { success: false, reason: 'Leaderboard system is disabled' };
+  if (await isLeaderboardBanned(uid)) return { success: false, reason: 'User is banned from leaderboard' };
+
+  const weights = config.scoringWeights || {};
+  let xp = weights.labCompletion || 80;
+
+  // Streak multiplier
+  const statsSnap = await db.doc(`user_stats/${uid}`).get();
+  const currentStats = statsSnap.exists ? statsSnap.data()! : {};
+  const streakDays = currentStats.streakDays || 0;
+  const streakMult = getStreakMultiplier(streakDays);
+  xp = Math.floor(xp * (1 + streakMult / 100));
+
+  // Season bonus
+  const activeSeason = await getActiveSeason();
+  let seasonXpDelta = 0;
+  if (activeSeason) {
+    xp = Math.floor(xp * (activeSeason.rules.xpMultiplier || 1));
+    seasonXpDelta = xp;
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const today = getRomeDateKey();
+  const weeklyKey = getWeeklyKey();
+  const username = await getUsername(uid);
+
+  const oldXpAllTime = currentStats.xpAllTime || 0;
+  const newXpAllTime = oldXpAllTime + xp;
+  const levelCurve = config.levelCurve || { base: 100, growth: 25, maxLevel: 50 };
+  const { level: newLevel, levelXp: newLevelXp } = computeLevel(newXpAllTime, levelCurve.base, levelCurve.growth, levelCurve.maxLevel);
+  const oldLevel = currentStats.level || 1;
+
+  const batch = db.batch();
+
+  // user_stats
+  batch.set(db.doc(`user_stats/${uid}`), {
+    uid,
+    xpAllTime: admin.firestore.FieldValue.increment(xp),
+    xpWeekly: (currentStats.weeklyKey === weeklyKey) ? admin.firestore.FieldValue.increment(xp) : xp,
+    weeklyKey,
+    lastActiveAt: now,
+    level: newLevel,
+    levelXp: newLevelXp,
+    seasonKey: activeSeason?.seasonKey || '',
+    seasonXp: activeSeason ? admin.firestore.FieldValue.increment(seasonXpDelta) : (currentStats.seasonXp || 0),
+    updatedAt: now,
+  }, { merge: true });
+
+  // Leaderboards
+  batch.set(db.doc(`leaderboard_weekly_global/${weeklyKey}/entries/${uid}`), {
+    uid, username, xp: admin.firestore.FieldValue.increment(xp), level: newLevel, updatedAt: now,
+  }, { merge: true });
+  batch.set(db.doc(`leaderboard_alltime_global/entries/${uid}`), {
+    uid, username, xp: admin.firestore.FieldValue.increment(xp), level: newLevel, updatedAt: now,
+  }, { merge: true });
+
+  if (courseId) {
+    batch.set(db.doc(`user_course_stats/${uid}_${courseId}`), {
+      uid, courseId,
+      xpAllTime: admin.firestore.FieldValue.increment(xp),
+      xpWeekly: admin.firestore.FieldValue.increment(xp),
+      weeklyKey, updatedAt: now,
+    }, { merge: true });
+
+    batch.set(db.doc(`leaderboard_weekly_course/${weeklyKey}_${courseId}/entries/${uid}`), {
+      uid, courseId, xp: admin.firestore.FieldValue.increment(xp), updatedAt: now,
+    }, { merge: true });
+    batch.set(db.doc(`leaderboard_alltime_course/${courseId}/entries/${uid}`), {
+      uid, courseId, xp: admin.firestore.FieldValue.increment(xp), updatedAt: now,
+    }, { merge: true });
+  }
+
+  if (activeSeason && seasonXpDelta > 0) {
+    batch.set(db.doc(`season_leaderboard/${activeSeason.seasonKey}/entries/${uid}`), {
+      uid, username, seasonXp: admin.firestore.FieldValue.increment(seasonXpDelta), updatedAt: now,
+    }, { merge: true });
+  }
+
+  // Heatmap
+  batch.set(db.doc(`study_activity_daily/${uid}/days/${today}`), {
+    date: today,
+    xpEarned: admin.firestore.FieldValue.increment(xp),
+    sessions: admin.firestore.FieldValue.increment(1),
+    questionsAnswered: 0,
+    updatedAt: now,
+  }, { merge: true });
+
+  // Activity feed
+  batch.set(db.collection('activity_events').doc(), {
+    type: 'lab_completed',
+    category: 'labs',
+    actorUid: uid,
+    actorUsername: username,
+    actorRole: 'user',
+    metadata: { xp, courseId, labId },
+    severity: 'low',
+    visibility: 'public',
+    timestamp: now,
+  });
+
+  await batch.commit();
+
+  // Check achievements
+  const updatedStats = {
+    ...currentStats, xpAllTime: newXpAllTime, level: newLevel, streakDays,
+  };
+  // special: first_lab
+  const labAchSnap = await db.doc(`users/${uid}/achievements/first_lab`).get();
+  if (!labAchSnap.exists) {
+    await db.doc(`users/${uid}/achievements/first_lab`).set({ id: 'first_lab', earnedAt: now });
+    await db.collection('notifications').add({
+      uid, type: 'achievement_earned', title: 'Achievement Unlocked!',
+      message: 'You earned the "Lab Rat" achievement', read: false,
+      metadata: { achievementId: 'first_lab' }, createdAt: now,
+    });
+  }
+  await checkAchievements(uid, updatedStats, username);
+
+  // Level up notification
+  if (newLevel > oldLevel) {
+    await db.collection('notifications').add({
+      uid, type: 'level_up', title: 'Level Up!',
+      message: `Congratulations! You reached Level ${newLevel}!`,
+      read: false, metadata: { oldLevel, newLevel }, createdAt: now,
+    });
+  }
+
+  return { success: true, xpAwarded: xp, newXpAllTime, level: newLevel, levelXp: newLevelXp };
+});
+
+// ─── Scheduled: Weekly Leaderboard Reset ───────────────────
+// Runs every Monday at 00:00 Europe/Rome
+export const weeklyLeaderboardReset = functions.pubsub
+  .schedule('0 0 * * 1')
+  .timeZone('Europe/Rome')
+  .onRun(async () => {
+    const newWeeklyKey = getWeeklyKey();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    // Reset all user_stats weekly fields
+    const userStatsSnap = await db.collection('user_stats').get();
+    const batchSize = 400;
+    let batch = db.batch();
+    let count = 0;
+
+    for (const doc of userStatsSnap.docs) {
+      batch.update(doc.ref, {
+        xpWeekly: 0,
+        weeklyKey: newWeeklyKey,
+        updatedAt: now,
+      });
+      count++;
+      if (count % batchSize === 0) {
+        await batch.commit();
+        batch = db.batch();
+      }
+    }
+
+    // Reset user_course_stats weekly fields
+    const courseStatsSnap = await db.collection('user_course_stats').get();
+    for (const doc of courseStatsSnap.docs) {
+      batch.update(doc.ref, {
+        xpWeekly: 0,
+        weeklyKey: newWeeklyKey,
+        updatedAt: now,
+      });
+      count++;
+      if (count % batchSize === 0) {
+        await batch.commit();
+        batch = db.batch();
+      }
+    }
+
+    if (count % batchSize !== 0) {
+      await batch.commit();
+    }
+
+    // Audit log
+    await db.collection('audit_log').add({
+      action: 'gamification.weekly_reset',
+      category: 'admin',
+      actorUid: 'system',
+      actorUsername: 'system',
+      actorRole: 'system',
+      details: { newWeeklyKey, usersReset: userStatsSnap.size },
+      timestamp: now,
+    });
+
+    console.log(`Weekly leaderboard reset to ${newWeeklyKey}: ${userStatsSnap.size} users processed`);
+  });
+
+// ─── Scheduled: Daily Streak Maintenance ───────────────────
+// Runs daily at 00:15 Europe/Rome
+export const dailyStreakMaintenance = functions.pubsub
+  .schedule('15 0 * * *')
+  .timeZone('Europe/Rome')
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+    const twoDaysAgo = new Date(now.toDate().getTime() - 2 * 24 * 60 * 60 * 1000);
+    const cutoff = admin.firestore.Timestamp.fromDate(twoDaysAgo);
+
+    // Find users whose lastActiveAt is more than 2 days ago (streak broken)
+    const staleSnap = await db.collection('user_stats')
+      .where('streakDays', '>', 0)
+      .get();
+
+    let resetCount = 0;
+    const batchSize = 400;
+    let batch = db.batch();
+    let count = 0;
+
+    for (const doc of staleSnap.docs) {
+      const data = doc.data();
+      const lastActive = data.lastActiveAt;
+      if (lastActive && lastActive.toDate && lastActive.toDate() < twoDaysAgo) {
+        batch.update(doc.ref, {
+          streakDays: 0,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        resetCount++;
+        count++;
+        if (count % batchSize === 0) {
+          await batch.commit();
+          batch = db.batch();
+        }
+      }
+    }
+
+    if (count % batchSize !== 0) {
+      await batch.commit();
+    }
+
+    console.log(`Daily streak maintenance: ${resetCount} streaks reset`);
+  });
+
+// ─── Scheduled: Season Maintenance ─────────────────────────
+// Runs daily at 00:20 Europe/Rome
+export const seasonMaintenance = functions.pubsub
+  .schedule('20 0 * * *')
+  .timeZone('Europe/Rome')
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+    const serverNow = admin.firestore.FieldValue.serverTimestamp();
+
+    // Check for ended seasons
+    const activeSnap = await db.collection('seasons')
+      .where('active', '==', true)
+      .get();
+
+    for (const doc of activeSnap.docs) {
+      const data = doc.data();
+      if (data.endsAt && data.endsAt.toDate() < now.toDate()) {
+        await doc.ref.update({ active: false, updatedAt: serverNow });
+        console.log(`Season ${data.seasonKey} ended`);
+
+        // Audit log
+        await db.collection('audit_log').add({
+          action: 'gamification.season_ended',
+          category: 'admin',
+          actorUid: 'system',
+          actorUsername: 'system',
+          actorRole: 'system',
+          details: { seasonKey: data.seasonKey },
+          timestamp: serverNow,
+        });
+      }
+    }
+
+    // Auto-activate next season if configured & within date range
+    const upcomingSnap = await db.collection('seasons')
+      .where('active', '==', false)
+      .orderBy('startsAt', 'asc')
+      .limit(5)
+      .get();
+
+    for (const doc of upcomingSnap.docs) {
+      const data = doc.data();
+      if (data.startsAt && data.startsAt.toDate() <= now.toDate() &&
+          data.endsAt && data.endsAt.toDate() > now.toDate()) {
+        await doc.ref.update({ active: true, updatedAt: serverNow });
+        console.log(`Season ${data.seasonKey} activated`);
+
+        await db.collection('audit_log').add({
+          action: 'gamification.season_started',
+          category: 'admin',
+          actorUid: 'system',
+          actorUsername: 'system',
+          actorRole: 'system',
+          details: { seasonKey: data.seasonKey },
+          timestamp: serverNow,
+        });
+      }
+    }
+  });
+
+// ─── Admin: Leaderboard Ban/Unban ──────────────────────────
+export const adminLeaderboardBan = functions.https.onCall(async (data, context) => {
+  const adminUid = await verifyAdmin(context);
+  const { targetUid, banned, reason } = data;
+
+  if (!targetUid) throw new functions.https.HttpsError('invalid-argument', 'targetUid is required');
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await db.doc(`leaderboard_bans/${targetUid}`).set({
+    banned: banned !== false,
+    reason: reason || '',
+    createdAt: now,
+    createdBy: adminUid,
+  });
+
+  // Audit log
+  const adminUsername = await getUsername(adminUid);
+  await db.collection('audit_log').add({
+    action: banned !== false ? 'gamification.user_banned' : 'gamification.user_unbanned',
+    category: 'admin',
+    actorUid: adminUid,
+    actorUsername: adminUsername,
+    actorRole: 'admin',
+    targetType: 'user',
+    targetId: targetUid,
+    details: { reason },
+    timestamp: now,
+  });
+
+  return { success: true };
+});
+
+// ─── Admin: Update Leaderboard Config ──────────────────────
+export const adminUpdateLeaderboardConfig = functions.https.onCall(async (data, context) => {
+  const adminUid = await verifyAdmin(context);
+  const { config: newConfig } = data;
+
+  if (!newConfig || typeof newConfig !== 'object') {
+    throw new functions.https.HttpsError('invalid-argument', 'config is required');
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await db.doc('leaderboard_config/singleton').set({
+    ...newConfig,
+    updatedAt: now,
+    updatedBy: adminUid,
+  }, { merge: true });
+
+  const adminUsername = await getUsername(adminUid);
+  await db.collection('audit_log').add({
+    action: 'gamification.config_updated',
+    category: 'admin',
+    actorUid: adminUid,
+    actorUsername: adminUsername,
+    actorRole: 'admin',
+    details: { changes: Object.keys(newConfig) },
+    timestamp: now,
+  });
+
+  return { success: true };
+});
+
+// ─── Admin: Force Weekly Reset ─────────────────────────────
+export const adminForceWeeklyReset = functions.https.onCall(async (data, context) => {
+  const adminUid = await verifyAdmin(context);
+  const newWeeklyKey = getWeeklyKey();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  const userStatsSnap = await db.collection('user_stats').get();
+  const batchArr: FirebaseFirestore.WriteBatch[] = [db.batch()];
+  let idx = 0;
+  let count = 0;
+
+  for (const doc of userStatsSnap.docs) {
+    batchArr[idx].update(doc.ref, { xpWeekly: 0, weeklyKey: newWeeklyKey, updatedAt: now });
+    count++;
+    if (count % 400 === 0) { await batchArr[idx].commit(); batchArr.push(db.batch()); idx++; }
+  }
+  if (count % 400 !== 0) await batchArr[idx].commit();
+
+  const adminUsername = await getUsername(adminUid);
+  await db.collection('audit_log').add({
+    action: 'gamification.force_weekly_reset',
+    category: 'admin',
+    actorUid: adminUid,
+    actorUsername: adminUsername,
+    actorRole: 'admin',
+    details: { newWeeklyKey, usersReset: userStatsSnap.size },
+    timestamp: now,
+  });
+
+  return { success: true, usersReset: userStatsSnap.size, newWeeklyKey };
+});
+
+// ─── Admin: Manage Season ──────────────────────────────────
+export const adminManageSeason = functions.https.onCall(async (data, context) => {
+  const adminUid = await verifyAdmin(context);
+  const { action: seasonAction, seasonKey, name, startsAt, endsAt, rules, active } = data;
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const adminUsername = await getUsername(adminUid);
+
+  if (seasonAction === 'create') {
+    if (!seasonKey || !name) throw new functions.https.HttpsError('invalid-argument', 'seasonKey and name required');
+    await db.doc(`seasons/${seasonKey}`).set({
+      seasonKey, name,
+      startsAt: startsAt ? admin.firestore.Timestamp.fromDate(new Date(startsAt)) : now,
+      endsAt: endsAt ? admin.firestore.Timestamp.fromDate(new Date(endsAt)) : null,
+      active: active || false,
+      rules: rules || { xpMultiplier: 1, bonusXpPerSession: 0 },
+      createdAt: now,
+    });
+  } else if (seasonAction === 'activate') {
+    if (!seasonKey) throw new functions.https.HttpsError('invalid-argument', 'seasonKey required');
+    // Deactivate all other seasons first
+    const allActive = await db.collection('seasons').where('active', '==', true).get();
+    for (const doc of allActive.docs) {
+      await doc.ref.update({ active: false, updatedAt: now });
+    }
+    await db.doc(`seasons/${seasonKey}`).update({ active: true, updatedAt: now });
+  } else if (seasonAction === 'deactivate') {
+    if (!seasonKey) throw new functions.https.HttpsError('invalid-argument', 'seasonKey required');
+    await db.doc(`seasons/${seasonKey}`).update({ active: false, updatedAt: now });
+  }
+
+  await db.collection('audit_log').add({
+    action: `gamification.season_${seasonAction}`,
+    category: 'admin',
+    actorUid: adminUid,
+    actorUsername: adminUsername,
+    actorRole: 'admin',
+    details: { seasonKey, seasonAction },
+    timestamp: now,
+  });
+
+  return { success: true };
+});
+
+// ─── Update Streak on Session ──────────────────────────────
+// Called client-side after practice, or automatically as part of awardXp
+export const updateStreak = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not authenticated');
+  const uid = context.auth.uid;
+
+  const today = getRomeDateKey();
+  const yesterday = getYesterdayRomeDateKey();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  const statsSnap = await db.doc(`user_stats/${uid}`).get();
+  const stats = statsSnap.exists ? statsSnap.data()! : {};
+  const lastActive = stats.lastActiveAt;
+
+  let newStreak = 1;
+  if (lastActive) {
+    const lastDate = lastActive.toDate
+      ? lastActive.toDate().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' })
+      : '';
+    if (lastDate === today) {
+      // Already active today, keep streak
+      newStreak = stats.streakDays || 1;
+    } else if (lastDate === yesterday) {
+      // Consecutive day
+      newStreak = (stats.streakDays || 0) + 1;
+    }
+    // else: streak broke, reset to 1
+  }
+
+  await db.doc(`user_stats/${uid}`).set({
+    streakDays: newStreak,
+    lastActiveAt: now,
+    updatedAt: now,
+  }, { merge: true });
+
+  // Also update the users/{uid} streak field for profile
+  await db.doc(`users/${uid}`).update({
+    streak: newStreak,
+    updatedAt: now,
+  });
+
+  return { success: true, streakDays: newStreak };
+});

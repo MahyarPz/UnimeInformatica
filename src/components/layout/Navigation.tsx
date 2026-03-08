@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   Shield,
+  Trophy,
   User,
   X,
   Zap,
@@ -41,6 +42,7 @@ const NAV_ICON_MAP: Record<string, React.ElementType> = {
   '/practice': Zap,
   '/ai': Bot,
   '/support': Heart,
+  '/leaderboard': Trophy,
 };
 
 export function Navigation() {
@@ -68,6 +70,7 @@ export function Navigation() {
     return [
       { href: '/courses', label: t('nav.courses'), icon: BookOpen },
       { href: '/practice', label: t('nav.practice'), icon: Zap },
+      { href: '/leaderboard', label: t('gamification.leaderboard'), icon: Trophy },
     ];
   }, [nav]);
 

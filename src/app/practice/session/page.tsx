@@ -13,6 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { logActivity } from '@/lib/firebase/activity';
+import { useGamificationActions } from '@/lib/hooks/useGamification';
 import {
   ArrowLeft,
   ArrowRight,
@@ -34,6 +35,7 @@ function PracticeSessionInner() {
   const router = useRouter();
   const { user, userProfile } = useAuth();
   const { addToast } = useToast();
+  const { awardPracticeXp } = useGamificationActions();
 
   const courseId = searchParams?.get('course') || '';
   const mode = (searchParams?.get('mode') || 'quick') as PracticeMode;
@@ -365,6 +367,20 @@ function PracticeSessionInner() {
         actorRole: userProfile?.role || 'user',
         metadata: { courseId, mode, score: calculateAccuracy(correctCount, questions.length), questionCount: questions.length },
       });
+
+      // Award XP via Cloud Function (server-computed, anti-cheat enforced)
+      try {
+        await awardPracticeXp({
+          uid: user!.uid,
+          courseId,
+          correctCount,
+          wrongCount: questions.length - correctCount,
+          sessionId,
+          durationSec: totalTime,
+        });
+      } catch (xpErr) {
+        console.warn('XP award failed (rate limit or cap):', xpErr);
+      }
 
       addToast({ title: 'Session complete!', description: `Score: ${calculateAccuracy(correctCount, questions.length)}%`, variant: 'success' });
     } catch (error) {

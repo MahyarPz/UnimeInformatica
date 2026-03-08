@@ -289,5 +289,142 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isAuthenticated();
     }
+
+    // ─── Gamification: Leaderboard Config ─────────────────
+    match /leaderboard_config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── Gamification: Leaderboard Bans ───────────────────
+    match /leaderboard_bans/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ─── Gamification: Weekly Global Leaderboard ──────────
+    match /leaderboard_weekly_global/{weeklyKey} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+
+      match /entries/{uid} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
+    }
+
+    // ─── Gamification: All-time Global Leaderboard ────────
+    match /leaderboard_alltime_global/entries/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // ─── Gamification: Weekly Per-course Leaderboard ──────
+    match /leaderboard_weekly_course/{weekCourseKey} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+
+      match /entries/{uid} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
+    }
+
+    // ─── Gamification: All-time Per-course Leaderboard ────
+    match /leaderboard_alltime_course/{courseId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+
+      match /entries/{uid} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
+    }
+
+    // ─── Gamification: Season Leaderboard ─────────────────
+    match /season_leaderboard/{seasonKey} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+
+      match /entries/{uid} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
+    }
+
+    // ─── Gamification: User Course Stats ──────────────────
+    match /user_course_stats/{docId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ─── Gamification: Study Activity Heatmap ─────────────
+    match /study_activity_daily/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if false;
+
+      match /days/{date} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if false;
+      }
+    }
+
+    // ─── Gamification: Seasons ────────────────────────────
+    match /seasons/{seasonKey} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── Gamification: Achievements ───────────────────────
+    match /users/{userId}/achievements/{achievementId} {
+      allow read: if isOwner(userId) || isAuthenticated();
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ─── Gamification: Challenges ─────────────────────────
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /user_challenges/{docId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // ─── Friends ──────────────────────────────────────────
+    match /friendships/{friendshipId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow delete: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+    }
+
+    // ─── Notifications ────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if false; // Cloud Functions / server only
+    }
+
+    // ─── User Privacy Settings ────────────────────────────
+    match /user_privacy/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(uid);
+    }
+
+    // ─── Friend Challenges ────────────────────────────────
+    match /friend_challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+    }
   }
 }

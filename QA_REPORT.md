@@ -597,3 +597,121 @@ A comprehensive session management system was added to handle:
 - **Server-enforced:** API routes verify tokens with `adminAuth.verifyIdToken()` — client guards are UX-only
 - **Firestore rules:** All admin collections require `isAdmin()` or `isAdminOrMod()`
 - **Draft TTL:** Practice drafts expire after 30 minutes in localStorage
+
+---
+
+## Section J — Gamification System
+
+### J1. XP Award Pipeline
+
+| Finding | Severity | Status |
+| --- | --- | --- |
+| XP is computed server-side via `awardXpForPracticeSession` Cloud Function | Info | ✅ Implemented |
+| Anti-cheat: daily XP cap (2000 default), session rate-limit (60s default) | Info | ✅ Implemented |
+| Session double-award prevention via `xpAwarded` flag on exam_session doc | Info | ✅ Implemented |
+| Streak multiplier applied at thresholds (3/7/14/30 days → 5/10/15/20%) | Info | ✅ Implemented |
+
+### J2. Leaderboard System
+
+| Finding | Severity | Status |
+| --- | --- | --- |
+| Four leaderboard types: weekly global, all-time global, weekly per-course, all-time per-course | Info | ✅ Implemented |
+| Season leaderboard entries when active season exists | Info | ✅ Implemented |
+| Weekly reset via scheduled Cloud Function (Monday 00:00 Europe/Rome) | Info | ✅ Implemented |
+| Admin can force weekly reset and ban users from leaderboard | Info | ✅ Implemented |
+| Leaderboard read-only for users; writes only via Cloud Functions (`allow write: if false`) | Info | ✅ Implemented |
+| Privacy: users can opt out of leaderboard via `user_privacy` settings | Info | ✅ Implemented |
+
+### J3. Level System
+
+| Finding | Severity | Status |
+| --- | --- | --- |
+| Level 1–50, XP curve: `base + growth * level^2` (default 100 + 25*level^2) | Info | ✅ Implemented |
+| Level computed server-side in Cloud Functions, stored in `gamification_stats` | Info | ✅ Implemented |
+| Level displayed on dashboard header, profile page, and leaderboard entries | Info | ✅ Implemented |
+
+### J4. Achievements
+
+| Finding | Severity | Status |
+| --- | --- | --- |
+| 15 achievement definitions stored in code (`ACHIEVEMENT_DEFINITIONS`) | Info | ✅ Implemented |
+| Achievements checked server-side after XP award via `checkAchievements()` | Info | ✅ Implemented |
+| Earned achievements stored in `gamification_stats/{uid}/achievements` subcollection | Info | ✅ Implemented |
+| Notification sent on achievement unlock | Info | ✅ Implemented |
+
+### J5. Study Heatmap
+
+| Finding | Severity | Status |
+| --- | --- | --- |
+| GitHub-style heatmap with 180 days of XP data | Info | ✅ Implemented |
+| Data stored in `study_activity_daily/{uid}/days/{date}` | Info | ✅ Implemented |
+| Written server-side by Cloud Functions, read-only for clients | Info | ✅ Implemented |
+
+### J6. Security Rules for Gamification
+
+| Finding | Severity | Status |
+| --- | --- | --- |
+| All leaderboard/stats collections: read by authenticated, write denied for clients | Info | ✅ Implemented |
+| Notifications: owner read/update/delete only, create denied for clients | Info | ✅ Implemented |
+| Privacy settings: owner reads/writes own document only | Info | ✅ Implemented |
+| Friendships: both parties can read/update/delete | Info | ✅ Implemented |
+
+### J7. Test Scenarios
+
+#### Scenario 1: XP Award After Practice
+
+- [ ] Complete a practice session (10 questions, 7 correct)
+- [ ] **Expected:** `awardXpForPracticeSession` Cloud Function is called
+- [ ] **Expected:** XP appears in `gamification_stats/{uid}` document
+- [ ] **Expected:** Leaderboard entries updated in weekly/alltime global and per-course
+- [ ] **Expected:** Study heatmap entry created for today's date
+
+#### Scenario 2: Anti-Cheat Rate Limit
+
+- [ ] Complete two practice sessions within 60 seconds
+- [ ] **Expected:** Second call returns error or is rate-limited
+- [ ] **Expected:** No duplicate XP awarded
+
+#### Scenario 3: Daily XP Cap
+
+- [ ] Award XP repeatedly until daily total exceeds 2000
+- [ ] **Expected:** XP stops being awarded once daily cap is reached
+
+#### Scenario 4: Weekly Leaderboard Reset
+
+- [ ] Has weekly XP > 0
+- [ ] Trigger `adminForceWeeklyReset` Cloud Function
+- [ ] **Expected:** All `leaderboard_weekly_global` documents cleared
+- [ ] **Expected:** User's `xpWeekly` in gamification_stats reset to 0
+
+#### Scenario 5: Streak Maintenance
+
+- [ ] User has streak of 5 days, does not practice for 24+ hours
+- [ ] `dailyStreakMaintenance` scheduled function runs
+- [ ] **Expected:** Streak resets to 0 for inactive users
+
+#### Scenario 6: Leaderboard Ban
+
+- [ ] Admin calls `adminLeaderboardBan` with a user UID
+- [ ] **Expected:** User's entries removed from all leaderboard collections
+- [ ] **Expected:** Ban record created in `leaderboard_bans`
+
+#### Scenario 7: Privacy Opt-Out
+
+- [ ] User disables "Show on Leaderboard" in dashboard privacy settings
+- [ ] **Expected:** `user_privacy/{uid}` updated with `showOnLeaderboard: false`
+- [ ] **Expected:** User does not appear in leaderboard queries
+
+#### Scenario 8: Season Leaderboard
+
+- [ ] Admin creates and activates a season via `adminManageSeason`
+- [ ] User completes a practice session during active season
+- [ ] **Expected:** Season leaderboard entry created in `season_leaderboard`
+- [ ] **Expected:** Season tab visible on leaderboard page
+
+#### Scenario 9: Achievement Unlock
+
+- [ ] User completes first practice session ever
+- [ ] **Expected:** `checkAchievements()` triggers and awards "first_session" achievement
+- [ ] **Expected:** Notification sent to user
+- [ ] **Expected:** Achievement appears on profile and dashboard achievements tab
