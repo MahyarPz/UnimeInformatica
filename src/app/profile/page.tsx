@@ -118,7 +118,7 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="pt-6 text-center">
               <Star className="h-8 w-8 mx-auto text-purple-500 mb-2" />
-              <div className="text-2xl font-bold">{stats?.totalSessions || 0}</div>
+              <div className="text-2xl font-bold">{stats?.sessionsCount || 0}</div>
               <p className="text-xs text-muted-foreground">Sessions</p>
             </CardContent>
           </Card>
